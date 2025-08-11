@@ -1,12 +1,12 @@
 import logging
-
+from scipy.optimize import nnls  # Add this import
 import numpy as np
 from abc import ABC, abstractmethod
 
 from guidance import Guidance
 from state import State
 from utils import quaternion_multiply, quaternion_inverse, quat_to_angle_axis, rotate_vector_by_quaternion
-from vehicle import Vehicle
+from vehicle import Vehicle, Falcon9SecondStage
 
 
 class Controller(ABC):
@@ -58,14 +58,6 @@ class PIDAttitudeController(Controller):
         self.previous_d_term = np.zeros(3)
         self.vehicle = vehicle
         self.last_update_time = None
-
-        # TODO: get rid of this when roll control is ready for stage 2
-        # Handle uncontrollable roll for single-engine vehicles (e.g., Stage 2)
-        if self.vehicle.num_engines == 1:
-            self.ki[2] = 0.0  # Disable integral for roll (no windup)
-            # Optional: Reduce or disable P/D for roll if desired
-            # self.kp[2] *= 0.1  # Mild damping only
-            # self.kd[2] *= 0.1
 
     def update(self, time: float, state_vector: np.ndarray, mission_planner_setpoints: dict, log_flag: bool) -> dict:
         current_quaternion = state_vector[6:10]
@@ -131,17 +123,13 @@ class PIDAttitudeController(Controller):
         control_torque[0] = np.clip(control_torque[0], -max_torque, max_torque)
         control_torque[1] = np.clip(control_torque[1], -max_torque, max_torque)
 
-        # TODO: get rid of this when roll control implemented for stage 2
-        if self.vehicle.num_engines == 1:
-            control_torque[2] = 0.0
-
         # Anti-windup: Recalculate integral error based on saturated torque
         # Skip axes where ki=0 to avoid division by zero
         mask = self.ki != 0
         self.integral_error[mask] = (control_torque[mask] - p_term[mask] - d_term[mask]) / self.ki[mask]
 
         effective_thrust_e = effective_thrust_magnitude / self.vehicle.num_engines
-        gimbal_angles_list = self.get_gimbal_commands(control_torque, effective_thrust_e, gimbal_arm)
+        gimbal_angles_list, rcs_levels = self.get_actuator_commands(control_torque, effective_thrust_e, gimbal_arm)
 
         if log_flag:
             current_z_unit_vector = rotate_vector_by_quaternion(np.array([0, 0, 1]), current_quaternion)
@@ -154,6 +142,7 @@ class PIDAttitudeController(Controller):
             current_pitch = np.rad2deg(np.pi / 2 - np.arccos(np.clip(current_dot, -1.0, 1.0)))
             desired_pitch = np.rad2deg(np.pi / 2 - np.arccos(np.clip(desired_dot, -1.0, 1.0)))
             logging.info(f"------------------------------------[GUIDANCE]--------------------------------------------")
+            # logging.info(f"thrust mode: {self.guidance.current_thrust_mode}")
             logging.info(
                 f"current quat: {np.round(current_quaternion, 4)} | current attitude (z_hat): {np.round(current_z_unit_vector, 4)}"
             )
@@ -178,42 +167,67 @@ class PIDAttitudeController(Controller):
             "engine_gimbal_angles": gimbal_angles_list,
             "throttle": throttle,
             "propellant_mass": current_propellant_mass,  # Pass to dynamics
+            "rcs_levels": rcs_levels,
         }
 
-    def get_gimbal_commands(self, desired_torque: np.ndarray, effective_thrust_e: float, gimbal_arm: float) -> list:
-        """
-        Map desired torque to per-engine gimbal angles (pitch, yaw) for all engines.
-        Args:
-            desired_torque: Desired torque in body frame [Tx, Ty, Tz] (N·m)
-            effective_thrust_e: Thrust per engine (N)
-            gimbal_arm: Current gimbal arm length (m) from CoM to engine pivot
-        Returns:
-            List of [pitch, yaw] angles (rad) for each engine
-        """
-        num_gimbals = self.vehicle.num_engines * 2  # pitch + yaw per engine
-        A = np.zeros((5, num_gimbals))  # Rows: Tx, Ty, Tz, netFx, netFy
-        for j in range(self.vehicle.num_engines):
-            px, py, pz = self.vehicle.engines[j]["position"]
-            pz = -gimbal_arm  # Update Z-position with dynamic CoM
-            col_pitch = 2 * j
-            col_yaw = 2 * j + 1
-            # Pitch effects (updated signs for new convention)
-            A[0, col_pitch] = pz * effective_thrust_e  # Tx
-            A[1, col_pitch] = 0  # Ty
-            A[2, col_pitch] = -px * effective_thrust_e  # Tz (roll)
-            A[3, col_pitch] = 0  # netFx
-            A[4, col_pitch] = -effective_thrust_e  # netFy
-            # Yaw effects (updated signs for new convention)
-            A[0, col_yaw] = 0  # Tx
-            A[1, col_yaw] = pz * effective_thrust_e  # Ty
-            A[2, col_yaw] = -py * effective_thrust_e  # Tz (roll)
-            A[3, col_yaw] = effective_thrust_e  # netFx
-            A[4, col_yaw] = 0  # netFy
+    def get_actuator_commands(
+        self, desired_torque: np.ndarray, effective_thrust_e: float, gimbal_arm: float
+    ) -> tuple[list, np.ndarray]:
+        sin_lim = np.sin(self.vehicle.engine_gimbal_limit_rad)
+        num_engines = self.vehicle.num_engines
+        num_gimbal_dofs = 2 * num_engines
+        A = np.zeros((3, num_gimbal_dofs))
 
-        desired_vec = np.concatenate((desired_torque, [0.0, 0.0]))  # Torque + zero lateral force
-        gimbal_vec = np.linalg.pinv(A) @ desired_vec  # Minimum-norm solution
-        gimbal_vec = np.clip(gimbal_vec, -self.vehicle.engine_gimbal_limit_rad, self.vehicle.engine_gimbal_limit_rad)
-        gimbal_angles_list = [
-            np.array([gimbal_vec[2 * j], gimbal_vec[2 * j + 1]]) for j in range(self.vehicle.num_engines)
-        ]
-        return gimbal_angles_list
+        for i in range(num_engines):
+            pos = self.vehicle.engines[i]["position"].copy()
+            pos[2] = -gimbal_arm
+
+            # Pitch dof (affects fy = -effective_thrust_e * sin_pitch)
+            delta_f_pitch = np.array([0.0, -effective_thrust_e, 0.0])
+            torque_pitch = np.cross(pos, delta_f_pitch)
+            A[:, 2 * i] = torque_pitch
+
+            # Yaw dof (affects fx = effective_thrust_e * sin_yaw)
+            delta_f_yaw = np.array([effective_thrust_e, 0.0, 0.0])
+            torque_yaw = np.cross(pos, delta_f_yaw)
+            A[:, 2 * i + 1] = torque_yaw
+
+        # Solve for u = [sin_pitch1, sin_yaw1, ..., sin_pitchN, sin_yawN]
+        u, _, _, _ = np.linalg.lstsq(A, desired_torque, rcond=None)
+        u_clipped = np.clip(u, -sin_lim, sin_lim)
+
+        # Compute gimbal angles
+        gimbal_angles_list = []
+        for i in range(num_engines):
+            sin_pitch = u_clipped[2 * i]
+            sin_yaw = u_clipped[2 * i + 1]
+            pitch = np.arcsin(sin_pitch)
+            yaw = np.arcsin(sin_yaw)
+            gimbal_angles_list.append([pitch, yaw])
+
+        # Compute achieved torque from gimbals
+        achieved_torque = np.dot(A, u_clipped)
+
+        # RCS allocation if available
+        if self.vehicle.rcs_thrusters:
+            num_rcs = len(self.vehicle.rcs_thrusters)
+            A_rcs = np.zeros((3, num_rcs))
+            for j, rcs in enumerate(self.vehicle.rcs_thrusters):
+                delta_f = rcs["max_thrust"] * rcs["direction"]
+                torque = np.cross(rcs["position"], delta_f)
+                A_rcs[:, j] = torque
+
+            residual = desired_torque - achieved_torque
+            # Clean up tiny floating-point noise in residual (set near-zero to exact zero)
+            residual = np.where(np.abs(residual) < 1e-12, 0.0, residual)
+
+            rcs_levels, _ = nnls(A_rcs, residual)
+
+            # Handle cases where levels > 1 by scaling
+            if np.any(rcs_levels > 1):
+                max_level = np.max(rcs_levels)
+                rcs_levels *= 1.0 / max_level
+        else:
+            rcs_levels = np.array([])
+
+        return gimbal_angles_list, rcs_levels

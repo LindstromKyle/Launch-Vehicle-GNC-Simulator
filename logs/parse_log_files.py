@@ -123,6 +123,14 @@ def parse_log_to_structured_array(filename):
             ang_acc_str = re.search(r"ang acc \(rad/s/s\): \[(.*?)\]", parts[2]).group(1)
             record["ang_acc"] = np.fromstring(ang_acc_str, sep=" ")
 
+            i += 1
+            new_torque_line = lines[i][6:].strip()
+            parts = [p.strip() for p in new_torque_line.split("|")]
+            tvt_str = re.search(r"thrust vector torque: \[(.*?)\]", parts[0]).group(1)
+            record["thrust_vector_torque"] = np.fromstring(tvt_str, sep=" ")
+            rcs_str = re.search(r"rcs torque: \[(.*?)\]", parts[1]).group(1)
+            record["rcs_torque"] = np.fromstring(rcs_str, sep=" ")
+
             # Parse gimbal angles (3 lines)
             gimbal_angles = np.zeros((9, 2))
             indices_list = [[0, 3, 6], [1, 4, 7], [2, 5, 8]]
@@ -202,6 +210,8 @@ def parse_log_to_structured_array(filename):
         ("desired_torque", np.float64, (3,)),
         ("throttle", np.float64),
         ("applied_torque", np.float64, (3,)),
+        ("thrust_vector_torque", np.float64, (3,)),
+        ("rcs_torque", np.float64, (3,)),
         ("ang_vel", np.float64, (3,)),
         ("ang_acc", np.float64, (3,)),
         ("engine_gimbal_angles", np.float64, (9, 2)),
@@ -423,7 +433,7 @@ def standard_plot_vs_time(field_names: list, structured_array: np.ndarray):
 
 if __name__ == "__main__":
     # Example usage:
-    array = parse_log_to_structured_array("stage_2.log")
+    array = parse_log_to_structured_array("orbit.log")
 
     time = array["time"]
     y_list = [

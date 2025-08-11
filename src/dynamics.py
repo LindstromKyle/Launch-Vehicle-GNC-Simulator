@@ -2,6 +2,9 @@ import numpy as np
 import logging
 
 from utils import compute_quaternion_derivative, rotate_vector_by_quaternion, compute_orbital_elements
+import warnings
+
+warnings.filterwarnings("error", category=RuntimeWarning)
 
 
 def calculate_dynamics(time, state, vehicle, environment, log_flag, controls):
@@ -37,9 +40,10 @@ def calculate_dynamics(time, state, vehicle, environment, log_flag, controls):
         thrust_vector_torque = np.zeros(3)
         mass_flow_rate = 0.0
 
+    rcs_force, rcs_torque = vehicle.rcs_vector(quaternion, controls.get("rcs_levels", []))
     gravitational_force = environment.gravitational_force(position, vehicle_mass)
     drag_force = environment.drag_force(position, velocity, vehicle, quaternion)
-    net_force = thrust_force + gravitational_force + drag_force
+    net_force = thrust_force + gravitational_force + drag_force + rcs_force
 
     acceleration = net_force / vehicle_mass
 
@@ -49,9 +53,12 @@ def calculate_dynamics(time, state, vehicle, environment, log_flag, controls):
     # Angular dynamics
     moment_of_inertia = vehicle.moment_of_inertia
     aerodynamic_torque = environment.aerodynamic_torque(position, velocity, quaternion, angular_velocity, vehicle)
-    total_torque = thrust_vector_torque + aerodynamic_torque
+    total_torque = thrust_vector_torque + aerodynamic_torque + rcs_torque
     angular_momentum = moment_of_inertia @ angular_velocity
-    gyroscopic_reaction_torque = np.cross(angular_velocity, angular_momentum)
+    try:
+        gyroscopic_reaction_torque = np.cross(angular_velocity, angular_momentum)
+    except:
+        pass
     angular_acceleration = np.linalg.inv(moment_of_inertia) @ (total_torque - gyroscopic_reaction_torque)
 
     # Log state evolution
@@ -59,6 +66,9 @@ def calculate_dynamics(time, state, vehicle, environment, log_flag, controls):
         logging.info(f"desired torque (N*m): {np.round(desired_torque, 4)} | throttle: {throttle:.4f}")
         logging.info(
             f"applied torque (N*m): {np.round(total_torque, 4)} | ang vel (rad/s): {np.round(angular_velocity, 4)} | ang acc (rad/s/s): {np.round(angular_acceleration, 4)}"
+        )
+        logging.info(
+            f"thrust vector torque: {np.round(thrust_vector_torque, 4)} | rcs torque: {np.round(rcs_torque, 4)}"
         )
         # TODO: fix discrepancy with 1 vs 9 engines (log parser will have to handle this?)
         if len(gimbal_angles) == 9:

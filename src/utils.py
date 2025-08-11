@@ -1,5 +1,8 @@
 import numpy as np
 from scipy.spatial.transform import Rotation
+import warnings
+
+warnings.filterwarnings("error", category=RuntimeWarning)
 
 
 def compute_acceleration(t_vals, velocity_vals):
@@ -69,7 +72,10 @@ def compute_quaternion_derivative(quaternion, angular_velocity):
             [w_z, w_y, -w_x, 0],
         ]
     )
-    derivative = 0.5 * Omega @ quaternion
+    try:
+        derivative = 0.5 * Omega @ quaternion
+    except:
+        pass
     return derivative
 
 

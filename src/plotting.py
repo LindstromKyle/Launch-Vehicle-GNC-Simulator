@@ -96,8 +96,8 @@ def plot_3D_integration_segments(t_vals, state_vals, phase_transitions=None, sho
     phase_colors = {
         "Initial Ascent": "blue",
         "Kick": "green",
-        "Prograde Stage 1": "yellow",
-        "Prograde Stage 2": "orange",
+        "Stage 1 Pitch Program": "yellow",
+        "Stage 2 Ascent Burn": "orange",
         "Coast": "purple",
         "Circularization": "red",
         "Orbit": "black",

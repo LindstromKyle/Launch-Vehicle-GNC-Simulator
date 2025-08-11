@@ -40,7 +40,9 @@ class Vehicle(ABC):
         self.prop_com_z = prop_com_z
 
         # Abstract properties/methods for stage-specific engine config
-        self._setup_engines()
+        self.engines = []
+        self.rcs_thrusters = []
+        self._setup_propulsion_system()
 
         # TODO: This needs to live somewhere else
         self.grid_fin_deflections = {
@@ -59,7 +61,7 @@ class Vehicle(ABC):
         return self.grid_fin_deflections
 
     @abstractmethod
-    def _setup_engines(self):
+    def _setup_propulsion_system(self):
         """Stage-specific engine configuration (positions, count, etc.)."""
         pass
 
@@ -120,9 +122,26 @@ class Vehicle(ABC):
         """
         return self.base_thrust_magnitude * max(min(throttle, 1.0), 0.0)
 
+    def rcs_vector(self, quaternion, rcs_levels):
+        if not self.rcs_thrusters or len(rcs_levels) == 0:
+            return np.zeros(3), np.zeros(3)
+
+        thrust_force = np.zeros(3)  # Inertial
+        thrust_torque = np.zeros(3)  # Body
+        for i, level in enumerate(rcs_levels):
+            if level <= 0:
+                continue
+            rcs = self.rcs_thrusters[i]
+            body_force = level * rcs["max_thrust"] * rcs["direction"]
+            inertial_force = rotate_vector_by_quaternion(body_force, quaternion)
+            torque = np.cross(rcs["position"], body_force)
+            thrust_force += inertial_force
+            thrust_torque += torque
+        return thrust_force, thrust_torque
+
 
 class Falcon9FirstStage(Vehicle):
-    def _setup_engines(self):
+    def _setup_propulsion_system(self):
         self.num_engines = 9
         self.thrust_per_engine = self.base_thrust_magnitude / self.num_engines
         self.mdot_per_engine = self.mdot_max / self.num_engines
@@ -137,7 +156,7 @@ class Falcon9FirstStage(Vehicle):
 
 
 class Falcon9SecondStage(Vehicle):
-    def _setup_engines(self):
+    def _setup_propulsion_system(self):
         self.num_engines = 1  # Single Merlin Vacuum engine
         self.thrust_per_engine = self.base_thrust_magnitude
         self.mdot_per_engine = self.mdot_max
@@ -145,3 +164,55 @@ class Falcon9SecondStage(Vehicle):
         pz = -self.engine_lever_arm
         center_position = np.array([0.0, 0.0, pz])
         self.engines = [{"position": center_position}]
+
+        self._setup_rcs()
+
+    def _setup_rcs(self):
+        rcs_max_thrust = 400.0  # N per thruster (approximate for Draco thrusters)
+        rcs_radius = 1.5  # m (radial distance from centerline)
+        rcs_arm = 5.0  # m (axial distance from CoM to RCS pods; adjust based on stage length)
+
+        # 4 pod positions at 90-degree intervals (body frame)
+        positions = [
+            np.array([rcs_radius, 0.0, rcs_arm]),
+            np.array([0.0, rcs_radius, rcs_arm]),
+            np.array([-rcs_radius, 0.0, rcs_arm]),
+            np.array([0.0, -rcs_radius, rcs_arm]),
+        ]
+
+        # Tangential directions (for roll control; signs chosen for consistent +Tz rotation)
+        tan_dirs = [
+            np.array([0.0, 1.0, 0.0]),  # +y at +x pos
+            np.array([-1.0, 0.0, 0.0]),  # -x at +y pos
+            np.array([0.0, -1.0, 0.0]),  # -y at -x pos
+            np.array([1.0, 0.0, 0.0]),  # +x at -y pos
+        ]
+
+        # Radial outward directions (for pitch/yaw control)
+        rad_dirs = [
+            np.array([1.0, 0.0, 0.0]),
+            np.array([0.0, 1.0, 0.0]),
+            np.array([-1.0, 0.0, 0.0]),
+            np.array([0.0, -1.0, 0.0]),
+        ]
+
+        self.rcs_thrusters = []
+        for i in range(4):
+            # Add tangential thrusters in both directions
+            for sign in [1.0, -1.0]:
+                self.rcs_thrusters.append(
+                    {
+                        "position": positions[i],
+                        "direction": sign * tan_dirs[i] / np.linalg.norm(tan_dirs[i]),
+                        "max_thrust": rcs_max_thrust,
+                    }
+                )
+            # Add radial thrusters in both directions
+            for sign in [1.0, -1.0]:
+                self.rcs_thrusters.append(
+                    {
+                        "position": positions[i],
+                        "direction": sign * rad_dirs[i] / np.linalg.norm(rad_dirs[i]),
+                        "max_thrust": rcs_max_thrust,
+                    }
+                )

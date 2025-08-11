@@ -34,7 +34,7 @@ separation_time = 162  # For now; later based on velocity/alt
 combined_dry_mass = stage1_dry_mass + stage1_reserve_prop + stage2_dry_mass + stage2_prop
 
 # Vehicle
-ascent_combined_stage = Falcon9FirstStage(
+stage_1 = Falcon9FirstStage(
     dry_mass=combined_dry_mass,
     initial_prop_mass=stage1_ascent_prop,
     base_thrust_magnitude=stage1_thrust,
@@ -83,7 +83,7 @@ pitch_start_time = 10.0
 burnout_time = 162.0
 
 # Phases
-ascent_phases = [
+stage1_phases = [
     TimeBasedPhase(end_time=pitch_start_time, attitude_mode="radial", throttle=1.0, name="Initial Ascent"),
     ProgrammedPitchPhase(
         end_time=burnout_time,
@@ -96,44 +96,44 @@ ascent_phases = [
 ]
 
 # Mission Planner
-ascent_planner = MissionPlanner(phases=ascent_phases, environment=environment, start_time=0.0)
+stage1_planner = MissionPlanner(phases=stage1_phases, environment=environment, start_time=0.0)
 
 # Guidance
-ascent_guidance = ModeBasedGuidance()
+stage1_guidance = ModeBasedGuidance()
 
-p = 6e3
-i = 0.1
-d = 2e5
+stage1_p = 6e3
+stage1_i = 0.1
+stage1_d = 2e5
 
 # Controller
 ascent_controller = PIDAttitudeController(
-    kp=np.array([p, p, 1.5 * p]),
-    ki=np.array([i, i, 1.5 * i]),
-    kd=np.array([d, d, 1.5 * d]),
-    guidance=ascent_guidance,
-    vehicle=ascent_combined_stage,
+    kp=np.array([stage1_p, stage1_p, 1.5 * stage1_p]),
+    ki=np.array([stage1_i, stage1_i, 1.5 * stage1_i]),
+    kd=np.array([stage1_d, stage1_d, 1.5 * stage1_d]),
+    guidance=stage1_guidance,
+    vehicle=stage_1,
 )
 
 # Simulator
-ascent_sim = Simulator(
-    vehicle=ascent_combined_stage,
+stage1_sim = Simulator(
+    vehicle=stage_1,
     environment=environment,
     initial_state=initial_state,
-    mission_planner=ascent_planner,
+    mission_planner=stage1_planner,
     t_0=0,
     t_final=162,
     delta_t=0.1,
     log_interval=1,
     log_name="stage_1",
 )
-ascent_sim.add_controller(ascent_controller)
+stage1_sim.add_controller(ascent_controller)
 
 print(f"Simulating Ascent...")
-ascent_t_vals, ascent_state_vals, ascent_phase_transitions = ascent_sim.run()
+stage1_t_vals, stage1_state_vals, stage1_phase_transitions = stage1_sim.run()
 
 plot_3D_integration_segments(
-    t_vals=ascent_t_vals,
-    state_vals=ascent_state_vals,
-    phase_transitions=ascent_phase_transitions,
+    t_vals=stage1_t_vals,
+    state_vals=stage1_state_vals,
+    phase_transitions=stage1_phase_transitions,
     show_earth=False,
 )

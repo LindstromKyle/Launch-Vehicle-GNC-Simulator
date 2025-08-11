@@ -3,7 +3,7 @@ import numpy as np
 from controller import PIDAttitudeController
 from environment import Environment
 from guidance import ModeBasedGuidance
-from mission import CoastPhase, CircBurnPhase, TimeBasedPhase, MissionPlanner, AscentBurnPhase, TargetApoPitchPhase
+from mission import CoastPhase, CircBurnPhase, TimeBasedPhase, MissionPlanner, TargetApoapsisPhase, TargetApoPitchPhase
 from simulator import Simulator
 from state import State
 from vehicle import Falcon9SecondStage
@@ -77,7 +77,7 @@ target_apoapsis = target_alt + environment.earth_radius
 simulation_end_time = 477
 stage2_phases = [
     TargetApoPitchPhase(
-        target_apoapsis=target_alt,
+        target_apoapsis=target_apoapsis,
         initial_pitch_deg=20,
         final_pitch_deg=0,
         kick_direction=np.array([0.0, 1.0, 0.0]),  # Default eastward
@@ -90,8 +90,9 @@ stage2_phases = [
 ]
 stage2_planner = MissionPlanner(phases=stage2_phases, environment=environment, start_time=separation_time)
 
-orbital_normal = np.cross(burnout_state_vector[:3], burnout_state_vector[3:6])
-orbital_normal /= np.linalg.norm(orbital_normal)
+# orbital_normal = np.cross(burnout_state_vector[:3], burnout_state_vector[3:6])
+# orbital_normal /= np.linalg.norm(orbital_normal)
+orbital_normal = np.array([-0.4771586578473682, 5.421010862427522e-20, 0.8788171682672672])
 stage2_guidance = ModeBasedGuidance(orbital_normal=orbital_normal)
 
 stage2_p = 3e2

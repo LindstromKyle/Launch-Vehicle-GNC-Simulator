@@ -3,7 +3,7 @@ import logging
 
 from controller import PIDAttitudeController
 from guidance import ModeBasedGuidance
-from mission import MissionPlanner, TimeBasedPhase, KickPhase, AscentBurnPhase, CoastPhase, CircBurnPhase
+from mission import MissionPlanner, TimeBasedPhase, KickPhase, TargetApoapsisPhase, CoastPhase, CircBurnPhase
 from plotting import plot_3D_trajectory, plot_1D_position_velocity_acceleration, plot_3D_integration_segments
 from utils import compute_minimal_quaternion_rotation, rotate_vector_by_quaternion
 from vehicle import Falcon9FirstStage
