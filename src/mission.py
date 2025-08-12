@@ -225,6 +225,10 @@ class CircBurnPhase(Phase):
         if elements is None:
             return False
 
+        # TODO: better way of doing this - currently checking for 1000km apoapsis
+        if elements["apoapsis_radius"] > 6371000 + 1000000:
+            return True
+
         # Existing check
         peri_ok = elements["periapsis_radius"] >= self.peri_tolerance_factor * elements["apoapsis_radius"]
 
@@ -312,7 +316,8 @@ class PEGPhase(Phase):
             return False
 
         # Existing checks
-        apo_ok = abs(elements["apoapsis_radius"] - self.target_apoapsis) <= self.apo_tolerance
+        # apo_ok = abs(elements["apoapsis_radius"] - self.target_apoapsis) <= self.apo_tolerance
+        apo_ok = elements["apoapsis_radius"] >= self.target_apoapsis - self.apo_tolerance
         mu = self.mu  # Injected via MissionPlanner
         a = elements["semi_major_axis"]
         r_apo = elements["apoapsis_radius"]
@@ -323,7 +328,8 @@ class PEGPhase(Phase):
         vel_ok = v_apo_projected >= self.vel_threshold_factor * v_circ
 
         # Enhanced checks for stability
-        ecc_ok = elements["eccentricity"] < 0.8  # Sub-orbital but not too hyperbolic
+        # ecc_ok = elements["eccentricity"] < 0.8  # Sub-orbital but not too hyperbolic
+        ecc_ok = True
 
         # Periapsis safety: complete early if approaching orbital (peri > -100 km altitude)
         # Assuming earth_radius is accessible via self.environment.earth_radius (inject if needed)
@@ -372,30 +378,6 @@ class MissionPlanner:
         elements = compute_orbital_elements(position, velocity, self.mu)
         altitude = (np.linalg.norm(position) - self.environment.earth_radius) / 1000
 
-        if log_flag:
-            # Full orbital velocity (magnitude)
-            r_unit_vector = position / np.linalg.norm(position)
-            orbital_velocity = np.linalg.norm(velocity)
-            # Radial velocity
-            radial_velocity = np.dot(velocity, r_unit_vector)
-            # Tangential velocity
-            tangential_velocity = (
-                np.sqrt(orbital_velocity**2 - radial_velocity**2)
-                if orbital_velocity**2 - radial_velocity**2 > 0.0
-                else 0.0
-            )
-            logging.info(f"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-            logging.info(f"---------------------------------[MISSION PLANNER]----------------------------------------")
-            logging.info(f"time (s): {time:.2f} | phase: {self.current_phase.name}")
-            logging.info(
-                f"current altitude (km): {altitude:.4f} | "
-                f"apoapsis altitude (km): {((elements["apoapsis_radius"] - self.environment.earth_radius) / 1000):.4f} | "
-                f"periapsis altitude (km): {((elements["periapsis_radius"] - self.environment.earth_radius) / 1000):.4f}"
-            )
-            logging.info(
-                f"orbital vel (km/s): {orbital_velocity/1000:.4f} | tangential vel (km/s): {tangential_velocity/1000:.4f} | radial vel (km/s): {radial_velocity/1000:.4f}"
-            )
-
         self.current_phase = self.phases[self.current_phase_idx]
         if self.current_phase.is_complete(time, state_vector, elements):
             self.current_phase_idx += 1
@@ -432,6 +414,30 @@ class MissionPlanner:
         setpoints["thrust"] = self.vehicle.base_thrust_magnitude
         setpoints["isp"] = self.vehicle.average_isp
         setpoints["dry_mass"] = self.vehicle.dry_mass
+
+        if log_flag:
+            # Full orbital velocity (magnitude)
+            r_unit_vector = position / np.linalg.norm(position)
+            orbital_velocity = np.linalg.norm(velocity)
+            # Radial velocity
+            radial_velocity = np.dot(velocity, r_unit_vector)
+            # Tangential velocity
+            tangential_velocity = (
+                np.sqrt(orbital_velocity**2 - radial_velocity**2)
+                if orbital_velocity**2 - radial_velocity**2 > 0.0
+                else 0.0
+            )
+            logging.info(f"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+            logging.info(f"---------------------------------[MISSION PLANNER]----------------------------------------")
+            logging.info(f"time (s): {time:.2f} | phase: {self.current_phase.name}")
+            logging.info(
+                f"current altitude (km): {altitude:.4f} | "
+                f"apoapsis altitude (km): {((elements["apoapsis_radius"] - self.environment.earth_radius) / 1000):.4f} | "
+                f"periapsis altitude (km): {((elements["periapsis_radius"] - self.environment.earth_radius) / 1000):.4f}"
+            )
+            logging.info(
+                f"orbital vel (km/s): {orbital_velocity/1000:.4f} | tangential vel (km/s): {tangential_velocity/1000:.4f} | radial vel (km/s): {radial_velocity/1000:.4f}"
+            )
 
         return setpoints
 

@@ -104,7 +104,7 @@ stage1_phases = [
     ProgrammedPitchPhase(
         end_time=burnout_time,
         initial_pitch_deg=90,
-        final_pitch_deg=40,
+        final_pitch_deg=45,
         kick_direction=kick_direction,
         throttle=1.0,
         name="Stage 1 Pitch Program",
@@ -144,7 +144,7 @@ stage1_sim = Simulator(
     t_0=0,
     t_final=162,
     delta_t=0.1,
-    log_interval=1,
+    log_interval=5,
     log_name="orbit",
 )
 stage1_sim.add_controller(ascent_controller)
@@ -196,7 +196,7 @@ stage2_phases = [
     PEGPhase(
         target_apoapsis=target_apoapsis,
         apo_tolerance=5000.0,  # m tolerance for apoapsis
-        vel_threshold_factor=0.9,  # Near full vel
+        vel_threshold_factor=0.8,
         throttle=1.0,
         name="Stage 2 Ascent Burn",
     ),
@@ -216,7 +216,7 @@ stage2_phases = [
         min_throttle=0.1,  # Optional; tune per engine
         throttle_kp=20.0,  # Optional; tune via sim runs
     ),
-    TimeBasedPhase(end_time=simulation_end_time, attitude_mode="prograde", throttle=0.0, name="Orbit"),
+    TimeBasedPhase(end_time=simulation_end_time, attitude_mode="passive", throttle=0.0, name="Orbit"),
 ]
 
 stage2_planner = MissionPlanner(
@@ -246,7 +246,7 @@ sim_stage2 = Simulator(
     t_0=separation_time,
     t_final=simulation_end_time,  # Enough for orbit
     delta_t=0.1,  # Larger step ok for vacuum
-    log_interval=1,
+    log_interval=0.5,
     log_name="orbit",
 )
 sim_stage2.add_controller(controller_stage2)

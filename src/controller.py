@@ -58,78 +58,100 @@ class PIDAttitudeController(Controller):
         self.previous_d_term = np.zeros(3)
         self.vehicle = vehicle
         self.last_update_time = None
+        self.prev_error_quat = np.array([1.0, 0.0, 0.0, 0.0])
 
     def update(self, time: float, state_vector: np.ndarray, mission_planner_setpoints: dict, log_flag: bool) -> dict:
-        current_quaternion = state_vector[6:10]
         current_propellant_mass = state_vector[13]
+        current_quaternion = state_vector[6:10]
+        attitude_mode = mission_planner_setpoints.get("attitude_mode", "prograde")
+        if attitude_mode != "passive":
 
-        # Throttle
-        throttle = mission_planner_setpoints.get("throttle", 1.0)
+            # Throttle
+            throttle = mission_planner_setpoints.get("throttle", 1.0)
 
-        # Get desired quaternion from guidance
-        desired_quaternion = self.guidance.get_desired_quaternion(time, state_vector, mission_planner_setpoints)
-        desired_quaternion /= np.linalg.norm(desired_quaternion)
+            # Get desired quaternion from guidance
+            desired_quaternion = self.guidance.get_desired_quaternion(time, state_vector, mission_planner_setpoints)
+            desired_quaternion /= np.linalg.norm(desired_quaternion)
 
-        # Compute quaternion error (expressed in Body basis vectors)
-        error_quaternion = quaternion_multiply(desired_quaternion, quaternion_inverse(current_quaternion))
-        error_quaternion /= np.linalg.norm(error_quaternion)
+            # Compute quaternion error (expressed in Body basis vectors)
+            error_quaternion = quaternion_multiply(desired_quaternion, quaternion_inverse(current_quaternion))
+            error_quaternion /= np.linalg.norm(error_quaternion)
 
-        # Convert to angle-axis for PID
-        angle_axis = quat_to_angle_axis(error_quaternion)
-        current_error = angle_axis[0] * angle_axis[1:]  # angle (rad) * Axis
+            if np.dot(error_quaternion, self.prev_error_quat) < 0:
+                error_quaternion = -error_quaternion
+            self.prev_error_quat = error_quaternion
 
-        # Basic gain scheduling
-        # Example: Scale kp/kd inversely with mass (higher control authority as mass drops)
-        current_mass = self.vehicle.dry_mass + current_propellant_mass
-        # TODO: think about this
-        # mass_ratio = current_mass / self.vehicle.dry_mass  # >1 early, ~1 late
-        # kp_scheduled = self.kp / mass_ratio  # Lower early, higher late
-        # kd_scheduled = self.kd / mass_ratio**0.5  # Mild scaling
-        kp_scheduled = self.kp
-        kd_scheduled = self.kd
+            # Convert to angle-axis for PID
+            angle_axis = quat_to_angle_axis(error_quaternion)
+            current_error = angle_axis[0] * angle_axis[1:]  # angle (rad) * Axis
 
-        # Compute PID terms
-        d_term = np.zeros(3)
-        if self.last_update_time:
-            dt = time - self.last_update_time
-            if dt > 0:
-                self.integral_error += current_error * dt
-                d_term = kd_scheduled * (current_error - self.previous_error) / dt
+            # Basic gain scheduling
+            # Example: Scale kp/kd inversely with mass (higher control authority as mass drops)
+            current_mass = self.vehicle.dry_mass + current_propellant_mass
+            # TODO: think about this
+            # mass_ratio = current_mass / self.vehicle.dry_mass  # >1 early, ~1 late
+            # kp_scheduled = self.kp / mass_ratio  # Lower early, higher late
+            # kd_scheduled = self.kd / mass_ratio**0.5  # Mild scaling
+            kp_scheduled = self.kp
+            kd_scheduled = self.kd
 
-        # Low pass filter on d term
-        # TODO: put alpha in __init__?
-        # alpha = 0.1
-        # d_term = alpha * d_term + (1 - alpha) * self.previous_d_term
-        # self.previous_d_term = d_term
+            # Compute PID terms
+            d_term = np.zeros(3)
+            if self.last_update_time:
+                dt = time - self.last_update_time
+                if dt > 0:
+                    self.integral_error += current_error * dt
+                    d_term = kd_scheduled * (current_error - self.previous_error) / dt
 
-        i_term = self.ki * self.integral_error
-        p_term = kp_scheduled * current_error
+            # Low pass filter on d term
+            # TODO: put alpha in __init__?
+            # alpha = 0.1
+            # d_term = alpha * d_term + (1 - alpha) * self.previous_d_term
+            # self.previous_d_term = d_term
 
-        self.last_update_time = time
-        self.previous_error = current_error
+            i_term = self.ki * self.integral_error
+            p_term = kp_scheduled * current_error
 
-        # Compute unsaturated torque
-        unsaturated_torque = p_term + i_term + d_term
+            self.last_update_time = time
+            self.previous_error = current_error
 
-        # Clip torque for saturation (anti-windup prep)
-        control_torque = unsaturated_torque.copy()
+            # Compute unsaturated torque
+            unsaturated_torque = p_term + i_term + d_term
 
-        # Map torque to actuators
-        thrust_magnitude = self.vehicle.get_thrust_magnitude(time)
-        effective_thrust_magnitude = thrust_magnitude * throttle
-        gimbal_arm = self.vehicle.get_gimbal_arm(current_propellant_mass)
-        max_torque = effective_thrust_magnitude * np.sin(self.vehicle.engine_gimbal_limit_rad) * gimbal_arm
-        # Clamp control torque to max for pitch and yaw
-        control_torque[0] = np.clip(control_torque[0], -max_torque, max_torque)
-        control_torque[1] = np.clip(control_torque[1], -max_torque, max_torque)
+            # Clip torque for saturation (anti-windup prep)
+            control_torque = unsaturated_torque.copy()
 
-        # Anti-windup: Recalculate integral error based on saturated torque
-        # Skip axes where ki=0 to avoid division by zero
-        mask = self.ki != 0
-        self.integral_error[mask] = (control_torque[mask] - p_term[mask] - d_term[mask]) / self.ki[mask]
+            # Map torque to actuators
+            thrust_magnitude = self.vehicle.get_thrust_magnitude(time)
+            effective_thrust_magnitude = thrust_magnitude * throttle
+            gimbal_arm = self.vehicle.get_gimbal_arm(current_propellant_mass)
+            max_torque = effective_thrust_magnitude * np.sin(self.vehicle.engine_gimbal_limit_rad) * gimbal_arm
+            # Clamp control torque to max for pitch and yaw
+            control_torque[0] = np.clip(control_torque[0], -max_torque, max_torque)
+            control_torque[1] = np.clip(control_torque[1], -max_torque, max_torque)
 
-        effective_thrust_e = effective_thrust_magnitude / self.vehicle.num_engines
-        gimbal_angles_list, rcs_levels = self.get_actuator_commands(control_torque, effective_thrust_e, gimbal_arm)
+            # Anti-windup: Recalculate integral error based on saturated torque
+            # Skip axes where ki=0 to avoid division by zero
+            mask = self.ki != 0
+            self.integral_error[mask] = (control_torque[mask] - p_term[mask] - d_term[mask]) / self.ki[mask]
+
+            effective_thrust_e = effective_thrust_magnitude / self.vehicle.num_engines
+            gimbal_angles_list, rcs_levels = self.get_actuator_commands(control_torque, effective_thrust_e, gimbal_arm)
+        else:
+            gimbal_angles_list = []
+            for engine in range(len(self.vehicle.engines)):
+                gimbal_angles_list.append([0, 0])
+            control_torque = np.zeros(3)
+            throttle = 0.0
+            rcs_levels = np.zeros(len(self.vehicle.rcs_thrusters))
+            desired_quaternion = current_quaternion
+            error_quaternion = np.array([1, 0, 0, 0])
+            angle_axis = np.zeros(4)
+            current_error = np.zeros(3)
+            p_term = np.zeros(3)
+            i_term = np.zeros(3)
+            d_term = np.zeros(3)
+            self.guidance.current_attitude_mode = "passive"
 
         if log_flag:
             current_z_unit_vector = rotate_vector_by_quaternion(np.array([0, 0, 1]), current_quaternion)
@@ -142,7 +164,7 @@ class PIDAttitudeController(Controller):
             current_pitch = np.rad2deg(np.pi / 2 - np.arccos(np.clip(current_dot, -1.0, 1.0)))
             desired_pitch = np.rad2deg(np.pi / 2 - np.arccos(np.clip(desired_dot, -1.0, 1.0)))
             logging.info(f"------------------------------------[GUIDANCE]--------------------------------------------")
-            # logging.info(f"thrust mode: {self.guidance.current_thrust_mode}")
+            logging.info(f"attitude mode: {self.guidance.current_attitude_mode}")
             logging.info(
                 f"current quat: {np.round(current_quaternion, 4)} | current attitude (z_hat): {np.round(current_z_unit_vector, 4)}"
             )

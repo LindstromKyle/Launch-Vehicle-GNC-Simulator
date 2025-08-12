@@ -40,10 +40,14 @@ def parse_log_to_structured_array(filename):
             # Skip to GUIDANCE
             while i < len(lines) and "GUIDANCE" not in lines[i]:
                 i += 1
-            i += 1  # Now at current quat line
+            i += 1  # Now at attitude mode line
 
             if i >= len(lines):
                 break
+            att_mode_line = lines[i][6:].strip()
+            record["attitude_mode"] = re.search(r"attitude mode: (.*)", att_mode_line).group(1).strip()
+
+            i += 1  # Now at current quat line
             quat_line = lines[i][6:].strip()
             parts = [p.strip() for p in quat_line.split("|")]
             quat_str = re.search(r"current quat: \[(.*?)\]", parts[0]).group(1)
@@ -187,6 +191,7 @@ def parse_log_to_structured_array(filename):
     dtype = [
         ("time", np.float64),
         ("phase", "U50"),
+        ("attitude_mode", "U50"),
         ("current_altitude", np.float64),
         ("apoapsis_altitude", np.float64),
         ("periapsis_altitude", np.float64),

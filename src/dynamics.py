@@ -55,10 +55,8 @@ def calculate_dynamics(time, state, vehicle, environment, log_flag, controls):
     aerodynamic_torque = environment.aerodynamic_torque(position, velocity, quaternion, angular_velocity, vehicle)
     total_torque = thrust_vector_torque + aerodynamic_torque + rcs_torque
     angular_momentum = moment_of_inertia @ angular_velocity
-    try:
-        gyroscopic_reaction_torque = np.cross(angular_velocity, angular_momentum)
-    except:
-        pass
+
+    gyroscopic_reaction_torque = np.cross(angular_velocity, angular_momentum)
     angular_acceleration = np.linalg.inv(moment_of_inertia) @ (total_torque - gyroscopic_reaction_torque)
 
     # Log state evolution
