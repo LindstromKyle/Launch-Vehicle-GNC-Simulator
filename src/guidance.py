@@ -174,96 +174,101 @@ class ModeBasedGuidance(Guidance):
                 desired_z_vector /= np.linalg.norm(desired_z_vector)
 
         elif mode == "peg":
-            # PEG params from setpoints
+
             mu = mission_planner_setpoints["mu"]
             g0 = mission_planner_setpoints["g0"]
             target_r = mission_planner_setpoints["target_r"]
+            target_a = mission_planner_setpoints["target_a"]
+            target_inclination = mission_planner_setpoints.get("target_inclination")
             thrust = mission_planner_setpoints["thrust"]
             isp = mission_planner_setpoints["isp"]
             dry_mass = mission_planner_setpoints["dry_mass"]
-            vel_threshold_factor = mission_planner_setpoints["vel_threshold_factor"]
+            throttle = mission_planner_setpoints.get("throttle", 1.0)
+
             prop_mass = state_vector[13]
             m = dry_mass + prop_mass
             v_e = isp * g0
-            mdot = thrust / v_e if v_e > 0 else 1e-6
+            mdot = (thrust * throttle) / v_e if v_e > 0 else 1e-6
             tau = m / mdot if mdot > 0 else 1e6
-
             r = np.linalg.norm(position)
             radial_unit = position / r
-            horizontal_unit = np.cross(self.orbital_normal, radial_unit)
-            horizontal_unit /= np.linalg.norm(horizontal_unit)
+            horizontal_projection = np.cross(self.orbital_normal, radial_unit)
+            horizontal_unit = horizontal_projection / np.linalg.norm(horizontal_projection)
             dr0 = np.dot(velocity, radial_unit)
             v_theta0 = np.dot(velocity, horizontal_unit)
-            v_circ = np.sqrt(mu / target_r)
-            required_delta_v = max(0.0, vel_threshold_factor * v_circ - v_theta0)
-            g = mu / r**2  # Positive
+            v_target = np.sqrt(mu * (2 / target_r - 1 / target_a))
+            required_delta_v = max(0.0, v_target - v_theta0)
+            g = mu / r**2
             centrifugal = v_theta0**2 / r if r > 0 else 0.0
-            g_net = g - centrifugal  # Net radial acceleration (negative if circular support)
+            g_net = centrifugal - g
 
-            # Initial T guess
+            if required_delta_v <= 75.0:
+                # print(f"Required Delta V Small: {required_delta_v}. Default to Horizontal")
+                self.current_attitude_mode = "horizontal"
+                return compute_minimal_quaternion_rotation(horizontal_unit)
+
             if required_delta_v > 0:
                 exp_term = np.exp(-required_delta_v / v_e)
                 T = tau * (1 - exp_term)
             else:
                 T = 0.1
             T = np.clip(T, 0.1, tau * 0.99)
-
-            # Converge
-            tol = 1e-2  # Loosen tol for stability
-            for _ in range(30):  # More iterations
+            tol = 10
+            damping = 0.5
+            for _ in range(100):
                 u = T / tau
                 if u >= 1:
                     u = 0.99
                     T = tau * u
-
                 log_term = max(1e-10, 1 - u)
                 b0 = -v_e * np.log(log_term)
                 b1 = tau * b0 - v_e * T
                 b2 = tau**2 * b0 - v_e * tau * T - 0.5 * v_e * T**2
-
                 c0 = b0 * T - b1
                 c1 = b1 * T - b2
-
-                # RHS with net g
-                rhs_dot = -dr0 + g_net * T
-                rhs_r = target_r - r - dr0 * T + 0.5 * g_net * T**2
-
+                rhs_dot = -dr0 - g_net * T
+                rhs_r = target_r - r - dr0 * T - 0.5 * g_net * T**2
                 A_mat = np.array([[b0, b1], [c0, c1]])
                 det = np.linalg.det(A_mat)
                 if abs(det) < 1e-6 or np.isnan(det):
-                    # Singular; fallback to prograde
-                    print(f"PEG Convergence Failed at t={time}. Defult Horizontal")
+                    print(f"PEG Convergence Failed at t={time}. Default Horizontal")
                     self.current_attitude_mode = "horizontal"
                     return compute_minimal_quaternion_rotation(horizontal_unit)
 
                 sol = np.linalg.solve(A_mat, [rhs_dot, rhs_r])
                 A, B = sol
-
                 integral_fr2 = A**2 * b0 + 2 * A * B * b1 + B**2 * b2
-
                 predicted = b0 - 0.5 * integral_fr2
-
                 error = predicted - required_delta_v
                 if abs(error) < tol:
                     break
-
-                der = max(1e-3, b0 / T)  # Avoid zero der
-                T -= error / der
+                der = max(1e-3, b0 / T)
+                T -= damping * error / der
                 T = np.clip(T, 0.1, tau * 0.99)
 
             f_r = A
-
-            # (Extremely) Low pass filter when approaching T=0
-            if T <= 1:
-                f_r = self.prev_f_r
-                # f_r = 0.9 * self.prev_f_r + 0.1 * f_r
-
-            f_r = np.clip(f_r, -1.0, 1.0)
             self.prev_f_r = f_r
 
-            f_theta = np.sqrt(max(0.0, 1 - f_r**2))
+            t_thresh = 2
+            if T <= t_thresh:
+                # f_r = self.prev_f_r
+                f_r = self.prev_f_r * (T / t_thresh)
 
-            desired_z_vector = f_r * radial_unit + f_theta * horizontal_unit
+            f_r = np.clip(f_r, -1.0, 1.0)
+            f_n = 0.0
+
+            if target_inclination is not None:
+                h_vec = np.cross(position, velocity)
+                h_norm = np.linalg.norm(h_vec)
+                if h_norm > 0:
+                    current_i = np.arccos(h_vec[2] / h_norm)
+                    delta_i = np.deg2rad(target_inclination) - current_i
+                    k_out = 0.05  # Tune this gain based on simulation tests
+                    f_n = k_out * delta_i
+                    f_n = np.clip(f_n, -0.3, 0.3)
+
+            f_theta = np.sqrt(max(0.0, 1 - f_r**2 - f_n**2))
+            desired_z_vector = f_r * radial_unit + f_theta * horizontal_unit + f_n * self.orbital_normal
             desired_z_vector /= np.linalg.norm(desired_z_vector)
 
             # print(

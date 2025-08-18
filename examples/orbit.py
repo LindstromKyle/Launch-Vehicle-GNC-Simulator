@@ -104,7 +104,7 @@ stage1_phases = [
     ProgrammedPitchPhase(
         end_time=burnout_time,
         initial_pitch_deg=90,
-        final_pitch_deg=45,
+        final_pitch_deg=30,
         kick_direction=kick_direction,
         throttle=1.0,
         name="Stage 1 Pitch Program",
@@ -182,8 +182,10 @@ stage_2 = Falcon9SecondStage(
     prop_com_z=stage2_prop_com_z,
 )
 
-target_alt = 300000.0
-target_apoapsis = target_alt + environment.earth_radius
+target_apo_alt = 300000.0
+target_peri_alt = 200000.0
+target_apoapsis = target_apo_alt + environment.earth_radius
+target_periapsis = target_peri_alt + environment.earth_radius
 simulation_end_time = separation_time + 1200
 burnout_quaternion = burnout_state_vector[6:10]
 burnout_position = burnout_state_vector[:3]
@@ -195,8 +197,13 @@ burnout_pitch = np.rad2deg(np.pi / 2 - np.arccos(np.clip(burnout_dot, -1.0, 1.0)
 stage2_phases = [
     PEGPhase(
         target_apoapsis=target_apoapsis,
-        apo_tolerance=5000.0,  # m tolerance for apoapsis
-        vel_threshold_factor=0.8,
+        target_periapsis=target_periapsis,
+        target_inclination=None,
+        apo_tolerance=10000.0,
+        peri_tolerance=20000.0,
+        min_throttle=0.1,  # Matches Circ
+        throttle_kp=20.0,  # Matches Circ
+        throttle_threshold_factor=5.0,  # This times tolerance is when to start modulating
         throttle=1.0,
         name="Stage 2 Ascent Burn",
     ),

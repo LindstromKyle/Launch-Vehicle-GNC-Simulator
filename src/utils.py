@@ -182,12 +182,16 @@ def compute_orbital_elements(position: np.ndarray, velocity: np.ndarray, gravita
         periapsis_radius = semi_latus_rectum / 2
         eccentricity = 1.0  # Override computed value for precision
 
+    h_norm = np.linalg.norm(angular_momentum_vector)
+    inclination = np.arccos(angular_momentum_vector[2] / h_norm) if h_norm > 0 else 0.0
+
     return {
         "semi_major_axis": semi_major_axis,
         "eccentricity": eccentricity,
         "apoapsis_radius": apoapsis_radius,
         "periapsis_radius": periapsis_radius,
         "eccentricity_vector": eccentricity_vector,
+        "inclination": inclination,
     }
 
 

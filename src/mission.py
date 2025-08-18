@@ -299,60 +299,75 @@ class PEGPhase(Phase):
     def __init__(
         self,
         target_apoapsis: float,
-        apo_tolerance: float = 1000.0,  # m tolerance for apoapsis
-        vel_threshold_factor: float = 0.92,  # Lower for elliptical (leave more for circ)
+        target_periapsis: float | None = None,
+        target_inclination: float | None = None,
+        apo_tolerance: float = 5000.0,
+        peri_tolerance: float = 5000.0,
+        min_throttle: float = 0.1,
+        throttle_kp: float = 20.0,
+        throttle_threshold_factor: float = 5.0,
         throttle: float = 1.0,
-        name: str = "PEG Guidance",
+        name: str = "PEG Ascent",
     ):
-        self.attitude_mode = "peg"
         self.target_apoapsis = target_apoapsis
+        self.target_periapsis = target_periapsis or (
+            target_apoapsis - 100000.0
+        )  # Default to slight ellipse if not specified
+        self.target_a = (self.target_apoapsis + self.target_periapsis) / 2
+        self.target_e = (self.target_apoapsis - self.target_periapsis) / (self.target_apoapsis + self.target_periapsis)
+        self.target_inclination = target_inclination
         self.apo_tolerance = apo_tolerance
-        self.vel_threshold_factor = vel_threshold_factor
+        self.peri_tolerance = peri_tolerance
+        self.min_throttle = min_throttle
+        self.throttle_kp = throttle_kp
+        self.throttle_threshold_factor = throttle_threshold_factor
         self.throttle = throttle
         self.name = name
+        self.attitude_mode = "peg"
 
     def is_complete(self, time: float, state_vector: np.ndarray, elements: dict | None) -> bool:
         if elements is None:
             return False
-
-        # Existing checks
-        # apo_ok = abs(elements["apoapsis_radius"] - self.target_apoapsis) <= self.apo_tolerance
-        apo_ok = elements["apoapsis_radius"] >= self.target_apoapsis - self.apo_tolerance
-        mu = self.mu  # Injected via MissionPlanner
-        a = elements["semi_major_axis"]
-        r_apo = elements["apoapsis_radius"]
-        if a == float("inf") or r_apo == float("inf"):
-            return apo_ok
-        v_apo_projected = np.sqrt(mu * (2 / r_apo - 1 / a)) if a > 0 else 0.0
-        v_circ = np.sqrt(mu / r_apo)
-        vel_ok = v_apo_projected >= self.vel_threshold_factor * v_circ
-
-        # Enhanced checks for stability
-        # ecc_ok = elements["eccentricity"] < 0.8  # Sub-orbital but not too hyperbolic
-        ecc_ok = True
-
-        # Periapsis safety: complete early if approaching orbital (peri > -100 km altitude)
-        # Assuming earth_radius is accessible via self.environment.earth_radius (inject if needed)
-        # TODO: better way to handle this than hard-code earth radius
-        peri_alt = elements["periapsis_radius"] - 6371000
-        peri_approaching = peri_alt > -100000  # -100 km
-
-        # Energy check: specific orbital energy
-        specific_energy = -mu / (2 * a) if a > 0 else float("inf")
-        target_circ_energy = -mu / (2 * self.target_apoapsis)  # For circular at apo
-        margin = 1e3  # m^2/s^2, tune as needed
-        energy_high = specific_energy > target_circ_energy - margin
-
-        # Complete if main criteria met AND ecc ok, OR safety triggers
-        return (apo_ok and vel_ok and ecc_ok) or peri_approaching or energy_high
+        apo_ok = abs(elements["apoapsis_radius"] - self.target_apoapsis) <= self.apo_tolerance
+        peri_ok = abs(elements["periapsis_radius"] - self.target_periapsis) <= self.peri_tolerance
+        inc_ok = True
+        if self.target_inclination is not None:
+            h_vec = np.cross(state_vector[:3], state_vector[3:6])
+            h_norm = np.linalg.norm(h_vec)
+            if h_norm > 0:
+                inc_current = np.rad2deg(np.arccos(h_vec[2] / h_norm))
+                inc_ok = abs(inc_current - self.target_inclination) <= 0.1  # 0.1 deg tolerance
+        return apo_ok and peri_ok and inc_ok
 
     def get_setpoints(self, time: float, state_vector: np.ndarray, elements: dict) -> dict:
-        return {
+        setpoints = {
             "throttle": self.throttle,
             "attitude_mode": self.attitude_mode,
-            "target_r": self.target_apoapsis,
-            "vel_threshold_factor": self.vel_threshold_factor,
+            "target_apoapsis": self.target_apoapsis,
+            "target_periapsis": self.target_periapsis,
+            "target_r": self.target_periapsis,
+            "target_a": self.target_a,
+            "target_inclination": self.target_inclination,
         }
+        if elements is not None:
+            apo_error = abs(self.target_apoapsis - elements["apoapsis_radius"])
+            peri_error = abs(self.target_periapsis - elements["periapsis_radius"])
+            max_error = max(apo_error, peri_error)
+            # Optionally include inc_error if targeted
+            if self.target_inclination is not None:
+                h_vec = np.cross(state_vector[:3], state_vector[3:6])
+                h_norm = np.linalg.norm(h_vec)
+                if h_norm > 0:
+                    inc_current = np.rad2deg(np.arccos(h_vec[2] / h_norm))
+                    inc_error = (
+                        abs(inc_current - self.target_inclination) * 10000.0
+                    )  # Scale deg to m-like for consistency (tune factor)
+                    max_error = max(max_error, inc_error)
+            throttle_threshold = self.throttle_threshold_factor * max(self.apo_tolerance, self.peri_tolerance)
+            if max_error < throttle_threshold:
+                normalized_error = max_error / self.target_apoapsis
+                setpoints["throttle"] = max(self.min_throttle, self.throttle_kp * normalized_error)
+        return setpoints
 
 
 class MissionPlanner:
@@ -395,17 +410,14 @@ class MissionPlanner:
 
         # Dynamically add start_time and duration if the phase supports it (e.g., for ProgrammedPitchPhase)
         if setpoints.get("attitude_mode") in ["programmed_pitch", "pitch_to_apoapsis"]:
-            start_time = self.phase_start_times[self.current_phase_idx]
-            setpoints["start_time"] = start_time
+            current_phase_start_time = self.phase_start_times[self.current_phase_idx]
+            setpoints["start_time"] = current_phase_start_time
             if setpoints.get("attitude_mode") == "programmed_pitch":
-                duration = self.current_phase.end_time - start_time
+                duration = self.current_phase.end_time - current_phase_start_time
                 setpoints["duration"] = duration
 
         setpoints["mu"] = self.mu
         setpoints["g0"] = 9.80665  # Standard gravity
-        setpoints["target_r"] = setpoints.get(
-            "target_r", elements["apoapsis_radius"]
-        )  # For circ phase, use current apo
         # Pass vehicle params (thrust, isp from vehicle; assume constant for now)
         setpoints["thrust"] = (
             self.vehicle.base_thrust_magnitude

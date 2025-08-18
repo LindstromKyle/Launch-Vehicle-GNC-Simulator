@@ -168,7 +168,7 @@ class Falcon9SecondStage(Vehicle):
         self._setup_rcs()
 
     def _setup_rcs(self):
-        rcs_max_thrust = 400.0  # N per thruster (approximate for Draco thrusters)
+        rcs_max_thrust = 2000.0  # N per thruster (400 approximate for Draco thrusters)
         rcs_radius = 1.5  # m (radial distance from centerline)
         rcs_arm = 5.0  # m (axial distance from CoM to RCS pods; adjust based on stage length)
 

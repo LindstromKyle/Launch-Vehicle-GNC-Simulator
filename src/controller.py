@@ -95,6 +95,11 @@ class PIDAttitudeController(Controller):
             kp_scheduled = self.kp
             kd_scheduled = self.kd
 
+            if throttle <= 0.1 or attitude_mode == "prograde":  # Coast/low-thrust mode
+                scale = 0.1  # Reduce gains; tune 0.05-0.2
+                kp_scheduled *= scale
+                kd_scheduled *= scale
+
             # Compute PID terms
             d_term = np.zeros(3)
             if self.last_update_time:
