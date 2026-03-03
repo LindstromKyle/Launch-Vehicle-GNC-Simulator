@@ -65,7 +65,7 @@ The following visualizations serve as strong proof of realism and performance.
 
 ### Engine Gimbal Angles During Gravity Turn
 
-![Engine_Gimbals](readme_imgs/Engine_Gimbal.png)
+![Engine_Gimbals](readme_imgs/gimbal.gif)
 
 ### Stage 2 Altitude Profile
 
