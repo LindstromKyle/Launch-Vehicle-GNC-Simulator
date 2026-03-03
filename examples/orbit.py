@@ -9,7 +9,6 @@ from mission import (
     MissionPlanner,
     CoastPhase,
     CircBurnPhase,
-    PitchToApoapsisPhase,
     PEGPhase,
 )
 from plotting import plot_3D_integration_segments
@@ -21,7 +20,7 @@ from vehicle import Falcon9FirstStage, Falcon9SecondStage
 # Stage 1
 stage1_dry_mass = 25600
 stage1_ascent_prop = 395700
-stage1_reserve_prop = 30000  # Approx for returns burns
+stage1_reserve_prop = 30000  # Return burn
 stage1_thrust = 7600000
 stage1_avg_isp = 300
 stage1_moi = np.diag([470297, 470297, 705445])
@@ -37,11 +36,11 @@ stage2_dry_mass = 4000
 stage2_prop = 111500
 stage2_thrust = 934000
 stage2_avg_isp = 348
-stage2_moi = np.diag([10000, 10000, 20000])  # Approximate scaled
+stage2_moi = np.diag([10000, 10000, 20000])
 stage2_cd_base = 0.3
 stage2_cd_scale = 2.0
-stage2_area = 7.0  # Smaller
-stage2_gimbal_limit = 5.0  # Vacuum engine
+stage2_area = 7.0
+stage2_gimbal_limit = 5.0
 stage2_gimbal_arm = 2.0
 stage2_dry_com_z = 3.0
 stage2_prop_com_z = 6.0
@@ -56,10 +55,10 @@ stage_1 = Falcon9FirstStage(
     initial_prop_mass=stage1_ascent_prop,
     base_thrust_magnitude=stage1_thrust,
     average_isp=stage1_avg_isp,
-    moment_of_inertia=stage1_moi + stage2_moi,  # Approx sum; improve later
+    moment_of_inertia=stage1_moi + stage2_moi,
     base_drag_coefficient=stage1_cd_base,
     drag_scaling_coefficient=stage1_cd_scale,
-    cross_sectional_area=stage1_area,  # Use stage1 area for stack
+    cross_sectional_area=stage1_area,
     engine_gimbal_limit_deg=stage1_gimbal_limit,
     engine_gimbal_arm_len=stage1_gimbal_arm,
     dry_com_z=15,
@@ -201,18 +200,18 @@ stage2_phases = [
         target_inclination=None,
         apo_tolerance=10000.0,
         peri_tolerance=20000.0,
-        min_throttle=0.1,  # Matches Circ
-        throttle_kp=20.0,  # Matches Circ
-        throttle_threshold_factor=5.0,  # This times tolerance is when to start modulating
+        min_throttle=0.1,
+        throttle_kp=20.0,
+        throttle_threshold_factor=5.0,
         throttle=1.0,
         name="Stage 2 Ascent Burn",
     ),
     CoastPhase(
-        time_to_apo_threshold=30.0,  # Fallback
+        time_to_apo_threshold=30.0,
         attitude_mode="prograde",
         throttle=0.0,
         name="Coast",
-        buffer=5.0,  # Tune this
+        buffer=5.0,
         use_dynamic_threshold=True,
     ),
     CircBurnPhase(
@@ -220,8 +219,8 @@ stage2_phases = [
         attitude_mode="prograde",
         throttle=1.0,
         name="Circularization",
-        min_throttle=0.1,  # Optional; tune per engine
-        throttle_kp=20.0,  # Optional; tune via sim runs
+        min_throttle=0.1,
+        throttle_kp=20.0,
         target_eccentricity=0.0011,
     ),
     TimeBasedPhase(end_time=simulation_end_time, attitude_mode="passive", throttle=0.0, name="Orbit"),
