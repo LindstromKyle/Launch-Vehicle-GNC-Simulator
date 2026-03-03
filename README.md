@@ -82,7 +82,6 @@ This project is a modular, physics-based 6-DoF rocket ascent simulator that mode
 ## Future Extensions
 
 
-
 - Monte Carlo framework for dispersion analysis  
 - Boost-back, re-entry, and landing burns with added control surfaces
 - C++/Rust performance port of dynamics & integration core  
