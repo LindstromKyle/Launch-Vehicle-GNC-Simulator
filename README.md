@@ -2,7 +2,7 @@
 
 ![Banner](readme_imgs/earth.png)
 
-*A complete Python-based 6-DoF simulation of a two-stage launch vehicle from liftoff to stable low-Earth orbit.*
+*A complete Python-based 6-DoF simulation of a two-stage launch vehicle from liftoff to stable low Earth orbit.*
 
 ## Table of Contents
 
@@ -14,19 +14,11 @@
 
 ## Overview
 
-This project is a modular, physics-based 6-DoF rocket ascent simulator that models the full flight from vertical liftoff through staging, vacuum guidance, coast, and orbital insertion. It includes:
-
-- Rigid-body dynamics with quaternion propagation  
-- Multi-engine thrust vector control with torque allocation  
-- Powered Explicit Guidance (PEG) for precise orbit targeting  
-- Realistic environment (J2 gravity, rotating Earth, AoA-dependent drag)  
-- Phase-based mission sequencing with automatic transitions  
-
-The simulation successfully reaches user-defined orbits (e.g. 275 × 290 km) using realistic control and guidance laws.
+This project is a modular, physics-based 6-DoF rocket ascent simulator that models the full flight from vertical liftoff through staging, vacuum guidance, coast, and orbital insertion. The simulation successfully reaches user-defined orbits (e.g. 275 × 290 km) using realistic control and guidance laws.
 
 ## Key Achievements
 
-- Implemented full 6-DoF mechanics with dynamic center of mass, multi-engine gimballing, and RCS thrusters  
+- Implemented full 6-DoF mechanics with rigid-body dynamics, quaternion propagation, multi-engine gimballing, RCS thrusters, and dynamic center of mass  
 - Built modular mission planner with clean phase transitions (Initial Ascent → Pitch Program → PEG → Coast → Circularization)  
 - Achieved stable orbital insertion with tight apoapsis/periapsis tolerances under gravity, drag, and J2 perturbations  
 - Created quality 3D trajectory visualizations segmented by mission phase  
@@ -36,7 +28,7 @@ The simulation successfully reaches user-defined orbits (e.g. 275 × 290 km) usi
 
 - **Dynamics**  
   - Quaternion-based attitude with angular velocity propagation  
-  - Least-squares gimbal allocation and RCS assist  
+  - Multi-engine thrust vector control and least-squares RCS allocation
   - Dynamic center-of-mass & gimbal arm length from propellant depletion 
   - Verlet integration with normalized quaternions  
 
@@ -57,8 +49,6 @@ The simulation successfully reaches user-defined orbits (e.g. 275 × 290 km) usi
 
 ## Results & Visualizations
 
-The following visualizations serve as strong proof of realism and performance.
-
 ### 3D Trajectory by Mission Phase with Earth Reference
 
 ![Orbit](readme_imgs/orbit.gif)
@@ -67,24 +57,31 @@ The following visualizations serve as strong proof of realism and performance.
 
 ![Engine_Gimbals](readme_imgs/gimbal.gif)
 
-### Stage 2 Altitude Profile
+> Note: The gimbal angles above are highly exaggerated for effect. 
 
-![Altitude vs Time](readme_imgs/Stage2AltitudeVsTime.png)
+### Altitude Profile (Launch through Second Stage Cut-off)
 
-### Altitude, Velocity & Acceleration Profiles
+![Altitude vs Time_1](readme_imgs/AltitudeVsTime_1.png)
 
-![Altitude and Velocity vs Time](images/altitude_velocity_profiles.png)
+### Altitude Profile (Coast through Orbit)
 
-### Pitch Angle & Guidance Mode Evolution
+![Altitude vs Time_2](readme_imgs/AltitudeVsTime_2.png)
 
-![Pitch Angle and Attitude Error vs Time](images/pitch_profile.png)
+### Velocity Profile
 
-### Orbital Elements Convergence (Apoapsis / Periapsis Targeting)
+![Velocity vs Time](readme_imgs/VelocityVsTime.png)
 
-![Orbital Elements Evolution](images/orbital_elements_convergence.png)
+### Pitch Angle Evolution
 
+![Pitch Angle vs Time](readme_imgs/PitchVsTime.png)
+
+### Example Logs
+
+![Logs](readme_imgs/logs.png)
 
 ## Future Extensions
+
+
 
 - Monte Carlo framework for dispersion analysis  
 - Boost-back, re-entry, and landing burns with added control surfaces
