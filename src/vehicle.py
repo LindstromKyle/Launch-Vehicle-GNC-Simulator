@@ -52,7 +52,7 @@ class Vehicle(ABC):
             "Fin 4": 0.0,
         }
 
-    # TODO: This needs to live somewhere else like above
+    # TODO: This needs to live somewhere else
     def get_grid_fin_deflections(self, time, state):
         """
         Placeholder for future control logic.
@@ -62,7 +62,7 @@ class Vehicle(ABC):
 
     @abstractmethod
     def _setup_propulsion_system(self):
-        """Stage-specific engine configuration (positions, count, etc.)."""
+        """Stage-specific engine configuration (positions, count, etc)."""
         pass
 
     def get_gimbal_arm(self, propellant_mass: float) -> float:

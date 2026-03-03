@@ -9,7 +9,7 @@ from utils import compute_minimal_quaternion_rotation, rotate_vector_by_quaterni
 from vehicle import Falcon9FirstStage
 from environment import Environment
 from state import State
-from integrator import integrate_rk4
+from integrator import integrate_rk4, integrate_verlet
 
 
 class Simulator:
@@ -47,7 +47,7 @@ class Simulator:
             format="[%(levelname)s] %(message)s",
             filemode="w",  # Overwrite log file each run
         )
-        t_vals, state_vals, phase_transitions = integrate_rk4(
+        t_vals, state_vals, phase_transitions = integrate_verlet(
             vehicle=self.vehicle,
             environment=self.environment,
             initial_state=self.initial_state.as_vector(),

@@ -49,9 +49,9 @@ class PIDAttitudeController(Controller):
             guidance ():
             vehicle ():
         """
-        self.kp = kp
+        self.kp = kp.copy()
         self.ki = ki.copy()  # Allow modification
-        self.kd = kd
+        self.kd = kd.copy()
         self.guidance = guidance
         self.integral_error = np.zeros(3)  # Accumulator for I term
         self.previous_error = np.zeros(3)
@@ -73,12 +73,21 @@ class PIDAttitudeController(Controller):
             desired_quaternion = self.guidance.get_desired_quaternion(time, state_vector, mission_planner_setpoints)
             desired_quaternion /= np.linalg.norm(desired_quaternion)
 
+            # === EXTRA SMOOTHING ON DESIRED QUATERNION (kills PEG jitter) ===
+            if not hasattr(self, "last_desired_quat"):
+                self.last_desired_quat = desired_quaternion.copy()
+            alpha_des = 0.96  # Tune 0.94–0.98 if needed
+            desired_quaternion = alpha_des * desired_quaternion + (1 - alpha_des) * self.last_desired_quat
+            self.last_desired_quat = desired_quaternion.copy()
+            desired_quaternion /= np.linalg.norm(desired_quaternion)
+
             # Compute quaternion error (expressed in Body basis vectors)
             error_quaternion = quaternion_multiply(desired_quaternion, quaternion_inverse(current_quaternion))
             error_quaternion /= np.linalg.norm(error_quaternion)
 
             if np.dot(error_quaternion, self.prev_error_quat) < 0:
                 error_quaternion = -error_quaternion
+            previous_angle_axis = quat_to_angle_axis(self.prev_error_quat)
             self.prev_error_quat = error_quaternion
 
             # Convert to angle-axis for PID
@@ -92,13 +101,18 @@ class PIDAttitudeController(Controller):
             # mass_ratio = current_mass / self.vehicle.dry_mass  # >1 early, ~1 late
             # kp_scheduled = self.kp / mass_ratio  # Lower early, higher late
             # kd_scheduled = self.kd / mass_ratio**0.5  # Mild scaling
-            kp_scheduled = self.kp
-            kd_scheduled = self.kd
+            kp_scheduled = self.kp.copy()
+            kd_scheduled = self.kd.copy()
 
-            if throttle <= 0.1 or attitude_mode == "prograde":  # Coast/low-thrust mode
-                scale = 0.1  # Reduce gains; tune 0.05-0.2
-                kp_scheduled *= scale
-                kd_scheduled *= scale
+            # Deadband RCS if coasting to hold prograde without continuously firing
+            if throttle <= 0.01:
+                prev_error_angle = np.rad2deg(previous_angle_axis[0])
+                error_angle = np.rad2deg(angle_axis[0])
+                hysteresis_inner_flag = (prev_error_angle > error_angle) and (error_angle < 0.1)
+                hysteresis_outer_flag = (prev_error_angle < error_angle) and (error_angle < 3.5)
+                if hysteresis_inner_flag or hysteresis_outer_flag:
+                    kp_scheduled = 0
+                    kd_scheduled = 0
 
             # Compute PID terms
             d_term = np.zeros(3)
@@ -110,9 +124,9 @@ class PIDAttitudeController(Controller):
 
             # Low pass filter on d term
             # TODO: put alpha in __init__?
-            # alpha = 0.1
-            # d_term = alpha * d_term + (1 - alpha) * self.previous_d_term
-            # self.previous_d_term = d_term
+            alpha = 0.3
+            d_term = alpha * d_term + (1 - alpha) * self.previous_d_term
+            self.previous_d_term = d_term
 
             i_term = self.ki * self.integral_error
             p_term = kp_scheduled * current_error
@@ -130,10 +144,11 @@ class PIDAttitudeController(Controller):
             thrust_magnitude = self.vehicle.get_thrust_magnitude(time)
             effective_thrust_magnitude = thrust_magnitude * throttle
             gimbal_arm = self.vehicle.get_gimbal_arm(current_propellant_mass)
-            max_torque = effective_thrust_magnitude * np.sin(self.vehicle.engine_gimbal_limit_rad) * gimbal_arm
-            # Clamp control torque to max for pitch and yaw
-            control_torque[0] = np.clip(control_torque[0], -max_torque, max_torque)
-            control_torque[1] = np.clip(control_torque[1], -max_torque, max_torque)
+            if effective_thrust_magnitude > 1e-3:
+                max_torque = effective_thrust_magnitude * np.sin(self.vehicle.engine_gimbal_limit_rad) * gimbal_arm
+                # Clamp control torque to max for pitch and yaw
+                control_torque[0] = np.clip(control_torque[0], -max_torque, max_torque)
+                control_torque[1] = np.clip(control_torque[1], -max_torque, max_torque)
 
             # Anti-windup: Recalculate integral error based on saturated torque
             # Skip axes where ki=0 to avoid division by zero

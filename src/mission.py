@@ -207,7 +207,7 @@ class CoastPhase(Phase):
 class CircBurnPhase(Phase):
     def __init__(
         self,
-        peri_tolerance_factor: float = 0.95,
+        peri_tolerance_factor: float = 0.85,
         attitude_mode: str = "prograde",
         throttle: float = 1.0,  # Max/default throttle
         name: str = "Unnamed",
@@ -232,20 +232,21 @@ class CircBurnPhase(Phase):
         # Existing check
         peri_ok = elements["periapsis_radius"] >= self.peri_tolerance_factor * elements["apoapsis_radius"]
 
-        # Enhanced checks
-        ecc_ok = elements["eccentricity"] < 0.01  # Near-circular
-
-        # Energy check similar to above
-        mu = self.mu
-        a = elements["semi_major_axis"]
-        specific_energy = -mu / (2 * a) if a > 0 else float("inf")
-        r_apo = elements["apoapsis_radius"]
-        target_circ_energy = -mu / (2 * r_apo)  # Circular at current apo
-        margin = 1e3
-        energy_ok = abs(specific_energy - target_circ_energy) <= margin
-
-        # Complete if peri ok AND ecc/energy stable
-        return peri_ok and ecc_ok and energy_ok
+        # # Enhanced checks
+        # ecc_ok = elements["eccentricity"] < 0.01  # Near-circular
+        #
+        # # Energy check similar to above
+        # mu = self.mu
+        # a = elements["semi_major_axis"]
+        # specific_energy = -mu / (2 * a) if a > 0 else float("inf")
+        # r_apo = elements["apoapsis_radius"]
+        # target_circ_energy = -mu / (2 * r_apo)  # Circular at current apo
+        # margin = 1e3
+        # energy_ok = abs(specific_energy - target_circ_energy) <= margin
+        #
+        # # Complete if peri ok AND ecc/energy stable
+        # return peri_ok and ecc_ok and energy_ok
+        return peri_ok
 
     def get_setpoints(self, time: float, state_vector: np.ndarray, elements: dict) -> dict:
         if elements["apoapsis_radius"] == float("inf") or elements["periapsis_radius"] <= 0:

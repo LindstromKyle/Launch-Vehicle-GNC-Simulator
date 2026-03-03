@@ -4,6 +4,8 @@ import numpy as np
 import re
 import matplotlib.pyplot as plt
 
+from plotting import plot_3D_integration_segments
+
 
 def parse_log_to_structured_array(filename):
     data = []
@@ -465,3 +467,7 @@ if __name__ == "__main__":
     # plot_exhaust_flow_directions(10.2, array, exaggerate_factor=300)
 
     standard_plot_vs_time(["desired_pitch", "current_pitch"], array)
+
+    # standard_plot_vs_time(["current_altitude", "orbital_vel"], array)
+
+    standard_plot_vs_time(["apoapsis_altitude", "periapsis_altitude", "current_altitude"], array)

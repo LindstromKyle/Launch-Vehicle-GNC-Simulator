@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 from abc import ABC, abstractmethod
 import cvxpy as cp
@@ -203,9 +205,11 @@ class ModeBasedGuidance(Guidance):
             g_net = centrifugal - g
 
             if required_delta_v <= 75.0:
-                # print(f"Required Delta V Small: {required_delta_v}. Default to Horizontal")
-                self.current_attitude_mode = "horizontal"
-                return compute_minimal_quaternion_rotation(horizontal_unit)
+                logging.warning(f"PEG MODE - REQUIRED DELTA V SMALL: {required_delta_v}. DEFAULT TO CURRENT ATTITUDE")
+                # self.current_attitude_mode = "horizontal"
+                # return compute_minimal_quaternion_rotation(horizontal_unit)
+                self.current_attitude_mode = "prograde"
+                return state_vector[6:10]
 
             if required_delta_v > 0:
                 exp_term = np.exp(-required_delta_v / v_e)
@@ -269,6 +273,14 @@ class ModeBasedGuidance(Guidance):
 
             f_theta = np.sqrt(max(0.0, 1 - f_r**2 - f_n**2))
             desired_z_vector = f_r * radial_unit + f_theta * horizontal_unit + f_n * self.orbital_normal
+
+            # === PEG OUTPUT SMOOTHING (prevents slow oscillation pickup) ===
+            alpha = 0.995
+            if not hasattr(self, "last_desired_z"):
+                self.last_desired_z = desired_z_vector.copy()
+            desired_z_vector = alpha * desired_z_vector + (1 - alpha) * self.last_desired_z
+            self.last_desired_z = desired_z_vector.copy()
+
             desired_z_vector /= np.linalg.norm(desired_z_vector)
 
             # print(
