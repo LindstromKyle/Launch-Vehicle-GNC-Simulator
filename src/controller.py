@@ -73,10 +73,10 @@ class PIDAttitudeController(Controller):
             desired_quaternion = self.guidance.get_desired_quaternion(time, state_vector, mission_planner_setpoints)
             desired_quaternion /= np.linalg.norm(desired_quaternion)
 
-            # === EXTRA SMOOTHING ON DESIRED QUATERNION (kills PEG jitter) ===
+            # smoothing desired quart
             if not hasattr(self, "last_desired_quat"):
                 self.last_desired_quat = desired_quaternion.copy()
-            alpha_des = 0.96  # Tune 0.94–0.98 if needed
+            alpha_des = 0.96
             desired_quaternion = alpha_des * desired_quaternion + (1 - alpha_des) * self.last_desired_quat
             self.last_desired_quat = desired_quaternion.copy()
             desired_quaternion /= np.linalg.norm(desired_quaternion)
@@ -95,12 +95,10 @@ class PIDAttitudeController(Controller):
             current_error = angle_axis[0] * angle_axis[1:]  # angle (rad) * Axis
 
             # Basic gain scheduling
-            # Example: Scale kp/kd inversely with mass (higher control authority as mass drops)
             current_mass = self.vehicle.dry_mass + current_propellant_mass
             # TODO: think about this
-            # mass_ratio = current_mass / self.vehicle.dry_mass  # >1 early, ~1 late
+            # mass_ratio = current_mass / self.vehicle.dry_mass
             # kp_scheduled = self.kp / mass_ratio  # Lower early, higher late
-            # kd_scheduled = self.kd / mass_ratio**0.5  # Mild scaling
             kp_scheduled = self.kp.copy()
             kd_scheduled = self.kd.copy()
 
@@ -208,7 +206,7 @@ class PIDAttitudeController(Controller):
             "desired_torque": control_torque,
             "engine_gimbal_angles": gimbal_angles_list,
             "throttle": throttle,
-            "propellant_mass": current_propellant_mass,  # Pass to dynamics
+            "propellant_mass": current_propellant_mass,
             "rcs_levels": rcs_levels,
         }
 

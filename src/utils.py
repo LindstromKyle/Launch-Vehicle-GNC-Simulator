@@ -96,7 +96,7 @@ def quat_to_angle_axis(q: np.ndarray) -> np.ndarray:
     if q[0] < 0:
         q = -q
     angle = 2 * np.arccos(np.clip(q[0], -1.0, 1.0))
-    if np.sin(angle / 2) < 1e-10:  # Near-zero angle:
+    if np.sin(angle / 2) < 1e-10:
         return np.array([0, 0, 0, 0])  # No rotation
     axis = q[1:] / np.sin(angle / 2)
 
@@ -127,7 +127,7 @@ def compute_minimal_quaternion_rotation(desired_z_vector):
     if dot > 0.99999:
         return np.array([1.0, 0.0, 0.0, 0.0])
     if dot < -0.99999:
-        # 180° flip (arbitrary axis)
+        # 180 flip
         return np.array([0.0, 1.0, 0.0, 0.0])
 
     cross_product = np.cross(body_z_vector, desired_z_vector)
@@ -161,7 +161,7 @@ def compute_orbital_elements(position: np.ndarray, velocity: np.ndarray, gravita
     ) - position / position_magnitude
     eccentricity = np.linalg.norm(eccentricity_vector)
 
-    ENERGY_TOLERANCE = 1e-10  # Small threshold to handle near-zero energy numerically
+    ENERGY_TOLERANCE = 1e-10
 
     if specific_orbital_energy < -ENERGY_TOLERANCE:
         # Elliptical orbit
@@ -174,13 +174,13 @@ def compute_orbital_elements(position: np.ndarray, velocity: np.ndarray, gravita
         apoapsis_radius = float("inf")
         periapsis_radius = semi_major_axis * (1 - eccentricity)
     else:
-        # Parabolic orbit (or near-parabolic)
+        # Parabolic orbit
         semi_major_axis = float("inf")
         apoapsis_radius = float("inf")
         h = np.linalg.norm(angular_momentum_vector)
         semi_latus_rectum = h**2 / gravitational_parameter
         periapsis_radius = semi_latus_rectum / 2
-        eccentricity = 1.0  # Override computed value for precision
+        eccentricity = 1.0
 
     h_norm = np.linalg.norm(angular_momentum_vector)
     inclination = np.arccos(angular_momentum_vector[2] / h_norm) if h_norm > 0 else 0.0
@@ -206,7 +206,7 @@ def compute_time_to_apoapsis(
     eccentricity_vector = orbital_elements["eccentricity_vector"]
     eccentricity = orbital_elements["eccentricity"]
     semi_major_axis = orbital_elements["semi_major_axis"]
-    # True anomaly true_anomaly
+    # True anomaly
     cosine_true_anomaly = np.dot(eccentricity_vector, position) / (eccentricity * position_magnitude)
     cosine_true_anomaly = np.clip(cosine_true_anomaly, -1.0, 1.0)
     true_anomaly_initial = np.arccos(cosine_true_anomaly)
@@ -215,20 +215,19 @@ def compute_time_to_apoapsis(
         true_anomaly = 2 * np.pi - true_anomaly_initial
     else:
         true_anomaly = true_anomaly_initial
-    # Eccentric anomaly eccentric_anomaly
+    # Eccentric anomaly
     sqrt_term = np.sqrt((1 - eccentricity) / (1 + eccentricity))
     tangent_half_true_anomaly = np.tan(true_anomaly / 2)
     eccentric_anomaly = 2 * np.arctan(sqrt_term * tangent_half_true_anomaly)
     if eccentric_anomaly < 0:
         eccentric_anomaly += 2 * np.pi
-    # Mean anomaly mean_anomaly
+    # Mean anomaly
     mean_anomaly = eccentric_anomaly - eccentricity * np.sin(eccentric_anomaly)
-    # Delta mean_anomaly to next apoapsis (mean_anomaly = pi at apo)
     if mean_anomaly < np.pi:
         delta_mean_anomaly = np.pi - mean_anomaly
     else:
         delta_mean_anomaly = np.pi - mean_anomaly + 2 * np.pi
-    # Mean motion mean_motion
+    # Mean motion
     mean_motion = np.sqrt(gravitational_parameter / semi_major_axis**3)
     time_to_apoapsis = delta_mean_anomaly / mean_motion
     return time_to_apoapsis

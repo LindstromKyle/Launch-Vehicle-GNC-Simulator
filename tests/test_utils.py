@@ -40,28 +40,6 @@ def test_error_quat_1():
     assert np.allclose(desired_vector, final_vector)
 
 
-# def test_error_quat_2():
-#     current_angle_axis = np.array([0, 0, 0, 1])
-#     current_quat = angle_axis_to_quat(current_angle_axis)
-#     current_vector = rotate_vector_by_quaternion(np.array([0, 0, 1]), current_quat)
-#
-#     angle_axis_1 = np.array([-np.pi/2, 1, 0, 0])
-#     quat_1 = angle_axis_to_quat(angle_axis_1)
-#     intermediate_vector_1 = rotate_vector_by_quaternion(current_vector, quat_1)
-#     angle_axis_2 = np.array([-np.pi/2, 0, 0, 1])
-#     quat_2 = angle_axis_to_quat(angle_axis_2)
-#     intermediate_vector_2 = rotate_vector_by_quaternion(intermediate_vector_1, quat_2)
-#
-#     desired_quat = quaternion_multiply(quat_2, quat_1)
-#     desired_angle_axis = quat_to_angle_axis(desired_quat)
-#     desired_vector = rotate_vector_by_quaternion(current_vector, desired_quat)
-#
-#     error_quaternion = quaternion_multiply(quaternion_inverse(desired_quat), current_quat)
-#     error_angle_axis = quat_to_angle_axis(error_quaternion)
-#     final_vector = rotate_vector_by_quaternion(current_vector, quaternion_inverse(error_quaternion))
-#     assert np.allclose(desired_vector, final_vector)
-
-
 def test_error_quat_3():
 
     current_angle_axis = np.array([-np.pi / 2, 1, 0, 0])

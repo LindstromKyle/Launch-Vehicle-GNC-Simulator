@@ -3,6 +3,7 @@ import logging
 from dynamics import calculate_dynamics
 import numpy as np
 from tqdm import tqdm
+from utils import quat_to_angle_axis, angle_axis_to_quat, quaternion_multiply
 
 
 def integrate_rk4(
@@ -111,16 +112,8 @@ def integrate_verlet(
     mission_planner,
 ):
     """
-    Pure Velocity Verlet (translation) + exact quaternion propagation (rotation).
-    - Symplectic energy conservation on orbit (no 100 km decay).
-    - Quaternion norm preserved exactly every step.
-    - Only 2 dynamics calls per step → fast and simple.
-    - Drop-in replacement for your old hybrid.
+    Pure Velocity Verlet
     """
-    import numpy as np
-    from tqdm import tqdm
-    from dynamics import calculate_dynamics
-    from utils import quat_to_angle_axis, angle_axis_to_quat, quaternion_multiply
 
     t_vals = [t_0]
     state_vals = [initial_state.copy()]
@@ -130,7 +123,7 @@ def integrate_verlet(
     phase_transitions = []
 
     max_iterations = int(np.floor((t_final - t_0) / delta_t))
-    p_bar = tqdm(total=max_iterations, desc="Simple Verlet (energy-preserving)", leave=True)
+    p_bar = tqdm(total=max_iterations, desc="Velocity Verlet", leave=True)
 
     while current_time < t_final:
         log_flag = last_logged_time is None or round(current_time - last_logged_time, 12) >= log_interval
@@ -139,7 +132,7 @@ def integrate_verlet(
 
         h = min(delta_t, t_final - current_time)
 
-        # === 1. Get controls and current acceleration/torque ===
+        # Get controls and current acceleration/torque
         setpoints = mission_planner.update(current_time, current_state, log_flag)
         controls = controller.update(current_time, current_state, setpoints, log_flag)
 
@@ -154,14 +147,14 @@ def integrate_verlet(
         acc_current = deriv_current[3:6]
         ang_acc_current = deriv_current[10:13]
 
-        # === 2. Half-step velocity and angular velocity (Velocity Verlet style) ===
+        # Half-step velocity and angular velocity
         current_state[3:6] += 0.5 * acc_current * h
         current_state[10:13] += 0.5 * ang_acc_current * h
 
-        # === 3. Full position update ===
+        # Full position update
         current_state[:3] += current_state[3:6] * h
 
-        # === 4. Exact quaternion update (constant ω over the step) ===
+        # Exact quaternion update (constant ω over the step)
         omega = current_state[10:13]
         omega_norm = np.linalg.norm(omega)
         if omega_norm > 1e-12:
@@ -170,18 +163,17 @@ def integrate_verlet(
             angle_axis[1:] = omega / omega_norm
             delta_q = angle_axis_to_quat(angle_axis)
             current_state[6:10] = quaternion_multiply(delta_q, current_state[6:10])
-        # else: ω ≈ 0 → quaternion unchanged (perfect for coast)
 
-        # Normalize (safety + exact preservation)
+        # Normalize
         qn = np.linalg.norm(current_state[6:10])
         if qn > 1e-12:
             current_state[6:10] /= qn
 
-        # Propellant (linear, exact)
+        # Propellant
         current_state[13] += deriv_current[13] * h
         current_state[13] = max(current_state[13], 0.0)
 
-        # === 5. Recompute forces/torques with NEW position + NEW attitude ===
+        # Recompute forces/torques
         deriv_new = calculate_dynamics(
             time=current_time + h,
             state=current_state,
@@ -193,7 +185,7 @@ def integrate_verlet(
         acc_new = deriv_new[3:6]
         ang_acc_new = deriv_new[10:13]
 
-        # === 6. Finish velocity and angular velocity ===
+        # Finish velocity and angular velocity
         current_state[3:6] += 0.5 * acc_new * h
         current_state[10:13] += 0.5 * ang_acc_new * h
 

@@ -1,14 +1,5 @@
-import numpy as np
 import logging
-
-from controller import PIDAttitudeController
-from guidance import ModeBasedGuidance
-from mission import MissionPlanner, TimeBasedPhase, KickPhase, TargetApoapsisPhase, CoastPhase, CircBurnPhase
-from plotting import plot_3D_trajectory, plot_1D_position_velocity_acceleration, plot_3D_integration_segments
-from utils import compute_minimal_quaternion_rotation, rotate_vector_by_quaternion
-from vehicle import Falcon9FirstStage
-from environment import Environment
-from state import State
+from plotting import plot_3D_trajectory, plot_1D_position_velocity_acceleration
 from integrator import integrate_rk4, integrate_verlet
 
 
@@ -33,7 +24,7 @@ class Simulator:
         self.t_final = t_final
         self.delta_t = delta_t
         self.log_interval = log_interval
-        self.controller = None  # To be set later
+        self.controller = None
         self.mission_planner = mission_planner
         self.log_name = log_name
 
@@ -43,9 +34,9 @@ class Simulator:
     def run(self):
         logging.basicConfig(
             filename=f"../logs/{self.log_name}.log",
-            level=logging.INFO,  # Use DEBUG for more detail
+            level=logging.INFO,
             format="[%(levelname)s] %(message)s",
-            filemode="w",  # Overwrite log file each run
+            filemode="w",
         )
         t_vals, state_vals, phase_transitions = integrate_verlet(
             vehicle=self.vehicle,

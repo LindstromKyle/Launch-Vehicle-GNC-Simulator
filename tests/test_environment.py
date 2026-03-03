@@ -61,7 +61,7 @@ def test_drag_force_magnitude():
         engine_gimbal_limit_deg=10.0,
         engine_gimbal_arm_len=18.0,
     )
-    velocity = np.array([0, 0, -100])  # 100 m/s downward
+    velocity = np.array([0, 0, -100])
     position = np.array([0, 0, R_earth + 1000])
     quaternion = np.array([1, 0, 0, 0])
     drag = env.drag_force(position, velocity, vehicle, quaternion)

@@ -14,12 +14,6 @@ def calculate_dynamics(time, state, vehicle, environment, log_flag, controls):
     angular_velocity = state[10:13]
     propellant_mass = state[13]
 
-    # if not np.isclose(np.linalg.norm(quaternion), 1):
-    #     pass
-
-    # if np.all(quaternion == np.array([0, 0, 0, 0])):
-    #     pass
-
     # Mass
     vehicle_mass = vehicle.dry_mass + max(propellant_mass, 0)  # Clamp to avoid negative
 

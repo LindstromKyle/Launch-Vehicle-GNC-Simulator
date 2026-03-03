@@ -1,5 +1,3 @@
-"""Vehicle Information"""
-
 from abc import abstractmethod, ABC
 
 import numpy as np
@@ -20,8 +18,8 @@ class Vehicle(ABC):
         cross_sectional_area: float,
         engine_gimbal_limit_deg: float,
         engine_gimbal_arm_len: float,
-        dry_com_z: float,  # New: Z-position of dry mass CoM above base (m)
-        prop_com_z: float,  # New: Z-position of propellant CoM above base (m)
+        dry_com_z: float,
+        prop_com_z: float,
     ):
         self.dry_mass = dry_mass
         self.initial_propellant_mass = initial_prop_mass
@@ -39,7 +37,7 @@ class Vehicle(ABC):
         self.dry_com_z = dry_com_z
         self.prop_com_z = prop_com_z
 
-        # Abstract properties/methods for stage-specific engine config
+        # stage-specific engine config
         self.engines = []
         self.rcs_thrusters = []
         self._setup_propulsion_system()
@@ -91,8 +89,8 @@ class Vehicle(ABC):
         # Get dynamic gimbal arm based on propellant mass
         gimbal_arm = self.get_gimbal_arm(propellant_mass)
 
-        thrust_force = np.zeros(3)  # Inertial frame
-        thrust_vector_torque = np.zeros(3)  # Body frame
+        thrust_force = np.zeros(3)
+        thrust_vector_torque = np.zeros(3)
         for i in range(self.num_engines):
             gimbal_pitch, gimbal_yaw = np.clip(
                 gimbal_angles_list[i],
@@ -110,7 +108,7 @@ class Vehicle(ABC):
             thrust_force += inertial_force
             # Torque: use dynamic gimbal arm for pitch/yaw, engine position for roll
             engine_pos = self.engines[i]["position"].copy()
-            engine_pos[2] = -gimbal_arm  # Update Z-position with dynamic CoM
+            engine_pos[2] = -gimbal_arm  # Update Z-position with dynamic center of mass
             body_torque = np.cross(engine_pos, body_force)
             thrust_vector_torque += body_torque
 
@@ -157,7 +155,7 @@ class Falcon9FirstStage(Vehicle):
 
 class Falcon9SecondStage(Vehicle):
     def _setup_propulsion_system(self):
-        self.num_engines = 1  # Single Merlin Vacuum engine
+        self.num_engines = 1
         self.thrust_per_engine = self.base_thrust_magnitude
         self.mdot_per_engine = self.mdot_max
         self.engine_radius = 0.0  # Centered
@@ -168,9 +166,9 @@ class Falcon9SecondStage(Vehicle):
         self._setup_rcs()
 
     def _setup_rcs(self):
-        rcs_max_thrust = 2000.0  # N per thruster (400 approximate for Draco thrusters)
-        rcs_radius = 1.5  # m (radial distance from centerline)
-        rcs_arm = 5.0  # m (axial distance from CoM to RCS pods; adjust based on stage length)
+        rcs_max_thrust = 2000.0
+        rcs_radius = 1.5
+        rcs_arm = 5.0
 
         # 4 pod positions at 90-degree intervals (body frame)
         positions = [
@@ -180,7 +178,7 @@ class Falcon9SecondStage(Vehicle):
             np.array([0.0, -rcs_radius, rcs_arm]),
         ]
 
-        # Tangential directions (for roll control; signs chosen for consistent +Tz rotation)
+        # Tangential directions
         tan_dirs = [
             np.array([0.0, 1.0, 0.0]),  # +y at +x pos
             np.array([-1.0, 0.0, 0.0]),  # -x at +y pos
@@ -188,7 +186,7 @@ class Falcon9SecondStage(Vehicle):
             np.array([1.0, 0.0, 0.0]),  # +x at -y pos
         ]
 
-        # Radial outward directions (for pitch/yaw control)
+        # Radial outward directions
         rad_dirs = [
             np.array([1.0, 0.0, 0.0]),
             np.array([0.0, 1.0, 0.0]),

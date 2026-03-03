@@ -98,14 +98,13 @@ class ModeBasedGuidance(Guidance):
                 if norm_cross > 1e-6:
                     horizontal_unit_vector = cross_product / norm_cross
                 else:
-                    # Fallback if zero (unlikely)
+                    # Fallback if zero
                     horizontal_projection = (
                         kick_direction - np.dot(kick_direction, radial_unit_vector) * radial_unit_vector
                     )
                     horizontal_unit_vector = horizontal_projection / np.linalg.norm(horizontal_projection)
 
                 # Desired z: sin(pitch) vertical (radial) + cos(pitch) horizontal
-                # (For pitch from horizontal: 0° = full horizontal, 90° = full vertical)
                 desired_z_vector = np.cos(pitch_rad) * horizontal_unit_vector + np.sin(pitch_rad) * radial_unit_vector
                 desired_z_vector /= np.linalg.norm(desired_z_vector)
 
@@ -113,17 +112,15 @@ class ModeBasedGuidance(Guidance):
             # Extract parameters from mission_planner_setpoints
             start_time = mission_planner_setpoints.get("start_time", 0.0)
             initial_pitch_deg = mission_planner_setpoints.get("initial_pitch_deg", 90.0)
-            base_pitch_rate_deg_per_sec = mission_planner_setpoints.get(
-                "base_pitch_rate_deg_per_sec", 0.4
-            )  # Default; tune this
+            base_pitch_rate_deg_per_sec = mission_planner_setpoints.get("base_pitch_rate_deg_per_sec", 0.4)
             min_pitch_deg = mission_planner_setpoints.get("min_pitch_deg", 20.0)
-            kp_apo = mission_planner_setpoints.get("kp_apo", 1.0)  # Updated name
-            kp_vel = mission_planner_setpoints.get("kp_vel", 0.8)  # New
-            vel_weight = mission_planner_setpoints.get("vel_weight", 0.5)  # New
-            vel_threshold_factor = mission_planner_setpoints.get("vel_threshold_factor", 0.95)  # New
+            kp_apo = mission_planner_setpoints.get("kp_apo", 1.0)
+            kp_vel = mission_planner_setpoints.get("kp_vel", 0.8)
+            vel_weight = mission_planner_setpoints.get("vel_weight", 0.5)
+            vel_threshold_factor = mission_planner_setpoints.get("vel_threshold_factor", 0.95)
             target_apoapsis = mission_planner_setpoints.get("target_apoapsis")
 
-            # Existing: Compute elements
+            # Compute elements
             position = state_vector[:3]
             velocity = state_vector[3:6]
             mu = self.environment.gravitational_constant * self.environment.earth_mass
@@ -132,11 +129,11 @@ class ModeBasedGuidance(Guidance):
             current_apo = elements["apoapsis_radius"]
             apo_error = (target_apoapsis - current_apo) / target_apoapsis  # Positive if lagging apo
 
-            # New: Velocity error (mirroring is_complete logic)
+            # Velocity error
             a = elements["semi_major_axis"]
             r_apo = elements["apoapsis_radius"]
             if a == float("inf") or r_apo == float("inf"):
-                vel_error = 0.0  # Fallback; early burn
+                vel_error = 0.0  # Fallback - early burn
             else:
                 v_apo_projected = np.sqrt(mu * (2 / r_apo - 1 / a)) if a > 0 else 0.0
                 v_circ = np.sqrt(mu / r_apo)
@@ -144,15 +141,10 @@ class ModeBasedGuidance(Guidance):
                     v_circ * vel_threshold_factor
                 )  # Positive if lagging velocity
 
-            # Combined error: Weighted sum (positive error -> increase rate for more horizontal thrust)
-            # combined_error = (1 - vel_weight) * apo_error + vel_weight * vel_error
-
             # Dynamic pitch rate
-            dynamic_pitch_rate = base_pitch_rate_deg_per_sec * (
-                1 + kp_apo * apo_error + kp_vel * vel_error
-            )  # Or use combined_error with a single kp
+            dynamic_pitch_rate = base_pitch_rate_deg_per_sec * (1 + kp_apo * apo_error + kp_vel * vel_error)
 
-            # Optional: Clamp rate to prevent extremes
+            # Clamp rate to prevent extremes
             dynamic_pitch_rate = np.clip(dynamic_pitch_rate, 0.1, 1.0)  # e.g., min 0.1 deg/s, max 1.0
 
             # Elapsed and pitch calc
@@ -206,8 +198,6 @@ class ModeBasedGuidance(Guidance):
 
             if required_delta_v <= 75.0:
                 logging.warning(f"PEG MODE - REQUIRED DELTA V SMALL: {required_delta_v}. DEFAULT TO CURRENT ATTITUDE")
-                # self.current_attitude_mode = "horizontal"
-                # return compute_minimal_quaternion_rotation(horizontal_unit)
                 self.current_attitude_mode = "prograde"
                 return state_vector[6:10]
 
@@ -255,7 +245,6 @@ class ModeBasedGuidance(Guidance):
 
             t_thresh = 2
             if T <= t_thresh:
-                # f_r = self.prev_f_r
                 f_r = self.prev_f_r * (T / t_thresh)
 
             f_r = np.clip(f_r, -1.0, 1.0)
@@ -267,14 +256,14 @@ class ModeBasedGuidance(Guidance):
                 if h_norm > 0:
                     current_i = np.arccos(h_vec[2] / h_norm)
                     delta_i = np.deg2rad(target_inclination) - current_i
-                    k_out = 0.05  # Tune this gain based on simulation tests
+                    k_out = 0.05
                     f_n = k_out * delta_i
                     f_n = np.clip(f_n, -0.3, 0.3)
 
             f_theta = np.sqrt(max(0.0, 1 - f_r**2 - f_n**2))
             desired_z_vector = f_r * radial_unit + f_theta * horizontal_unit + f_n * self.orbital_normal
 
-            # === PEG OUTPUT SMOOTHING (prevents slow oscillation pickup) ===
+            # PEG smoothing
             alpha = 0.995
             if not hasattr(self, "last_desired_z"):
                 self.last_desired_z = desired_z_vector.copy()
@@ -282,10 +271,6 @@ class ModeBasedGuidance(Guidance):
             self.last_desired_z = desired_z_vector.copy()
 
             desired_z_vector /= np.linalg.norm(desired_z_vector)
-
-            # print(
-            #     f"Time: {time} | f_r: {f_r} | f_theta: {f_theta} | T: {T} | req_delta_v: {required_delta_v} | error: {error}"
-            # )
 
         elif mode == "passive":
             # Set desired to current quaternion (no control needed)

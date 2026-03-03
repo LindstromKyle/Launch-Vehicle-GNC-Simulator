@@ -41,7 +41,7 @@ def test_pid_attitude_hold():
         kp=np.array([1e4, 1e4, 5e4]),
         ki=np.array([1e-3, 1e-3, 1e-3]),
         kd=np.array([1e6, 1e6, 5e5]),
-        desired_quaternion=np.array([0.9990, 0.0, 0.0436, 0.0]),  # 5° pitch
+        desired_quaternion=np.array([0.9990, 0.0, 0.0436, 0.0]),  # 5 deg pitch
         vehicle=sim.vehicle,
     )
     sim.add_controller(controller)

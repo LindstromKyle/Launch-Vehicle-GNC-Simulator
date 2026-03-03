@@ -84,10 +84,10 @@ class PitchToApoapsisPhase(Phase):
         min_pitch_deg: float = 20.0,
         throttle: float = 1.0,
         name: str = "Pitch to Apoapsis",
-        kp_apo: float = 1.0,  # Renamed for clarity
-        kp_vel: float = 0.8,  # New: Gain for velocity error (tune lower than apo if velocity is secondary)
-        vel_weight: float = 0.5,  # New: How much to weight velocity vs. apo in combined error (0-1)
-        vel_threshold_factor: float = 0.95,  # New: Mirror is_complete threshold
+        kp_apo: float = 1.0,
+        kp_vel: float = 0.8,
+        vel_weight: float = 0.5,
+        vel_threshold_factor: float = 0.95,
     ):
         self.initial_pitch_deg = initial_pitch_deg
         self.base_pitch_rate_deg_per_sec = base_pitch_rate_deg_per_sec
@@ -105,15 +105,15 @@ class PitchToApoapsisPhase(Phase):
         if elements is None:
             return False
 
-        # Existing apoapsis check
+        # apoapsis check
         apo_ok = elements["apoapsis_radius"] >= self.target_apoapsis
 
-        # New: Velocity targeting
+        #  Velocity targeting
         mu = self.mu  # Now available
         a = elements["semi_major_axis"]
         r_apo = elements["apoapsis_radius"]
 
-        if a == float("inf") or r_apo == float("inf"):  # Parabolic/hyperbolic edge case
+        if a == float("inf") or r_apo == float("inf"):
             return apo_ok  # Fallback to just apoapsis
 
         # Projected velocity at apoapsis
@@ -122,7 +122,7 @@ class PitchToApoapsisPhase(Phase):
         # Circular velocity at apoapsis altitude
         v_circ = np.sqrt(mu / r_apo)
 
-        # Threshold: e.g., 95% of circular speed (tune this)
+        # Threshold
         vel_threshold = 0.95
         vel_ok = v_apo_projected >= vel_threshold * v_circ
 
@@ -136,22 +136,22 @@ class PitchToApoapsisPhase(Phase):
             "base_pitch_rate_deg_per_sec": self.base_pitch_rate_deg_per_sec,
             "min_pitch_deg": self.min_pitch_deg,
             "kp_apo": self.kp_apo,
-            "kp_vel": self.kp_vel,  # New
-            "vel_weight": self.vel_weight,  # New
+            "kp_vel": self.kp_vel,
+            "vel_weight": self.vel_weight,
             "target_apoapsis": self.target_apoapsis,
-            "vel_threshold_factor": self.vel_threshold_factor,  # New
+            "vel_threshold_factor": self.vel_threshold_factor,
         }
 
 
 class CoastPhase(Phase):
     def __init__(
         self,
-        time_to_apo_threshold: float = 30.0,  # Fallback fixed threshold (s)
+        time_to_apo_threshold: float = 30.0,
         attitude_mode: str = "prograde",
         throttle: float = 0.0,
         name: str = "Coast",
-        buffer: float = 5.0,  # Safety buffer (s) for starting early
-        use_dynamic_threshold: bool = True,  # Toggle for dynamic vs. fixed
+        buffer: float = 5.0,
+        use_dynamic_threshold: bool = True,
     ):
         self.time_to_apo_threshold = time_to_apo_threshold
         self.attitude_mode = attitude_mode
@@ -184,15 +184,15 @@ class CoastPhase(Phase):
         delta_v = v_circ - v_apo
 
         if delta_v <= 0:
-            return True  # Already circular or super-circular
+            return True  # Already circular
 
-        # Estimate burn time (assume full throttle for conservatism)
+        # Estimate burn time
         prop_mass = state_vector[13]
         m0 = self.vehicle.dry_mass + prop_mass
-        ve = self.vehicle.average_isp * 9.80665  # g0 standard value
-        T = self.vehicle.base_thrust_magnitude  # Can multiply by e.g. 0.7 if average throttle <1
+        ve = self.vehicle.average_isp * 9.80665
+        T = self.vehicle.base_thrust_magnitude
         if T <= 0 or ve <= 0 or m0 <= 0:
-            return False  # Invalid; fallback implicitly
+            return False  # Invalid - fallback
 
         burn_time = (m0 * ve / T) * (1 - np.exp(-delta_v / ve))
         half_burn = burn_time / 2 + self.buffer
@@ -211,13 +211,13 @@ class CircBurnPhase(Phase):
         attitude_mode: str = "prograde",
         throttle: float = 1.0,  # Max/default throttle
         name: str = "Unnamed",
-        min_throttle: float = 0.1,  # Engine minimum (prevent flameout/stability issues)
-        throttle_kp: float = 20.0,  # Proportional gain; tune so error=0.05 -> throttle=1.0
+        min_throttle: float = 0.1,
+        throttle_kp: float = 20.0,
         target_eccentricity: float = 0.002,
     ):
         self.peri_tolerance_factor = peri_tolerance_factor
         self.attitude_mode = attitude_mode
-        self.throttle = throttle  # Unused now; kept for consistency
+        self.throttle = throttle
         self.name = name
         self.min_throttle = min_throttle
         self.throttle_kp = throttle_kp
@@ -234,35 +234,24 @@ class CircBurnPhase(Phase):
         # Existing check
         peri_ok = elements["periapsis_radius"] >= self.peri_tolerance_factor * elements["apoapsis_radius"]
 
-        # # Enhanced checks
+        # Eccentricity checks
         ecc_ok = elements["eccentricity"] < self.target_eccentricity
-        #
-        # # Energy check similar to above
-        # mu = self.mu
-        # a = elements["semi_major_axis"]
-        # specific_energy = -mu / (2 * a) if a > 0 else float("inf")
-        # r_apo = elements["apoapsis_radius"]
-        # target_circ_energy = -mu / (2 * r_apo)  # Circular at current apo
-        # margin = 1e3
-        # energy_ok = abs(specific_energy - target_circ_energy) <= margin
-        #
-        # # Complete if peri ok AND ecc/energy stable
-        # return peri_ok and ecc_ok and energy_ok
+
         return ecc_ok
 
     def get_setpoints(self, time: float, state_vector: np.ndarray, elements: dict) -> dict:
         if elements["apoapsis_radius"] == float("inf") or elements["periapsis_radius"] <= 0:
-            # Safety: Fallback for hyperbolic or invalid orbits (e.g., early in sim)
+            # Safety: Fallback for hyperbolic or invalid orbits
             dynamic_throttle = 1.0
         else:
             ratio = elements["periapsis_radius"] / elements["apoapsis_radius"]
-            error = max(0.0, 1.0 - ratio)  # Positive error; 0 when circular/peri > apo (rare)
+            error = max(0.0, 1.0 - ratio)  # Positive error
             dynamic_throttle = max(self.min_throttle, min(1.0, self.throttle_kp * error))
 
         return {
             "throttle": dynamic_throttle,
             "attitude_mode": self.attitude_mode,
-            "target_r": elements.get("apoapsis_radius", float("inf")),  # For consistency with PEG
+            "target_r": elements.get("apoapsis_radius", float("inf")),
         }
 
 
@@ -272,7 +261,7 @@ class ProgrammedPitchPhase(Phase):
         end_time: float,
         initial_pitch_deg: float,
         final_pitch_deg: float,
-        kick_direction: np.ndarray = np.array([0.0, 1.0, 0.0]),  # Default eastward
+        kick_direction: np.ndarray = np.array([0.0, 1.0, 0.0]),  # Default east
         throttle: float = 1.0,
         name: str = "Pitch Program",
     ):
@@ -282,7 +271,7 @@ class ProgrammedPitchPhase(Phase):
         self.kick_direction = kick_direction
         self.throttle = throttle
         self.name = name
-        self.attitude_mode = "programmed_pitch"  # Custom mode for guidance
+        self.attitude_mode = "programmed_pitch"
 
     def is_complete(self, time: float, state_vector: np.ndarray, elements: dict | None) -> bool:
         return time >= self.end_time
@@ -294,7 +283,6 @@ class ProgrammedPitchPhase(Phase):
             "initial_pitch_deg": self.initial_pitch_deg,
             "final_pitch_deg": self.final_pitch_deg,
             "kick_direction": self.kick_direction,
-            # Note: start_time and duration are added dynamically by MissionPlanner
         }
 
 
@@ -356,15 +344,12 @@ class PEGPhase(Phase):
             apo_error = abs(self.target_apoapsis - elements["apoapsis_radius"])
             peri_error = abs(self.target_periapsis - elements["periapsis_radius"])
             max_error = max(apo_error, peri_error)
-            # Optionally include inc_error if targeted
             if self.target_inclination is not None:
                 h_vec = np.cross(state_vector[:3], state_vector[3:6])
                 h_norm = np.linalg.norm(h_vec)
                 if h_norm > 0:
                     inc_current = np.rad2deg(np.arccos(h_vec[2] / h_norm))
-                    inc_error = (
-                        abs(inc_current - self.target_inclination) * 10000.0
-                    )  # Scale deg to m-like for consistency (tune factor)
+                    inc_error = abs(inc_current - self.target_inclination) * 10000.0
                     max_error = max(max_error, inc_error)
             throttle_threshold = self.throttle_threshold_factor * max(self.apo_tolerance, self.peri_tolerance)
             if max_error < throttle_threshold:
@@ -382,9 +367,9 @@ class MissionPlanner:
         self.environment = environment
         self.vehicle = vehicle
         self.phase_transitions = [(start_time, phases[0].name)]
-        self.phase_start_times = [start_time] * len(phases)  # Initialize list for each phase's start time
-        self.phase_start_times[0] = start_time  # Set initial
-        # Inject mu to phases if needed (for CoastPhase)
+        self.phase_start_times = [start_time] * len(phases)
+        self.phase_start_times[0] = start_time
+        # Inject mu to phases if needed
         for phase in self.phases:
             # TODO: find better way than his hack
             phase.mu = self.mu
@@ -411,7 +396,7 @@ class MissionPlanner:
         # Get base setpoints from phase
         setpoints = self.current_phase.get_setpoints(time, state_vector, elements)
 
-        # Dynamically add start_time and duration if the phase supports it (e.g., for ProgrammedPitchPhase)
+        # Dynamically add start_time and duration
         if setpoints.get("attitude_mode") in ["programmed_pitch", "pitch_to_apoapsis"]:
             current_phase_start_time = self.phase_start_times[self.current_phase_idx]
             setpoints["start_time"] = current_phase_start_time
@@ -421,17 +406,14 @@ class MissionPlanner:
 
         setpoints["mu"] = self.mu
         setpoints["g0"] = 9.80665  # Standard gravity
-        # Pass vehicle params (thrust, isp from vehicle; assume constant for now)
-        setpoints["thrust"] = (
-            self.vehicle.base_thrust_magnitude
-        )  # Wait, vehicle is not in environment; fix: add self.vehicle = vehicle in MissionPlanner __init__
-        # In MissionPlanner __init__, add self.vehicle = vehicle (pass vehicle in orbit.py when creating planner)
+        # Pass vehicle params
+        setpoints["thrust"] = self.vehicle.base_thrust_magnitude
         setpoints["thrust"] = self.vehicle.base_thrust_magnitude
         setpoints["isp"] = self.vehicle.average_isp
         setpoints["dry_mass"] = self.vehicle.dry_mass
 
         if log_flag:
-            # Full orbital velocity (magnitude)
+            # Full orbital velocity
             r_unit_vector = position / np.linalg.norm(position)
             orbital_velocity = np.linalg.norm(velocity)
             # Radial velocity

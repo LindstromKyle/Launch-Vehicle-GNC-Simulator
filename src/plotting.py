@@ -5,15 +5,6 @@ from utils import compute_acceleration, quat_to_angle_axis
 
 
 def plot_3D_trajectory(t_vals, state_vals):
-    """
-
-    Args:
-        t_vals ():
-        state_vals ():
-
-    Returns:
-
-    """
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection="3d")
 
@@ -73,17 +64,6 @@ def plot_1D_position_velocity_acceleration(t_vals, state_vals, axis, environment
     axs[2].grid()
     axs[2].sharex(axs[0])
 
-    # drag_vals = np.array([
-    #     np.linalg.norm(environment.drag_force(p, v, vehicle))
-    #     for p, v in zip(state_vals[:, 2], state_vals[:, 5])
-    # ])
-    # axs[2].plot(t_vals, drag_vals)
-    # axs[2].set_xlabel("Time (s)")
-    # axs[2].set_ylabel("Acceleration (m/s^2)")
-    # axs[2].set_title("Acceleration vs Time")
-    # axs[2].grid()
-    # axs[2].sharex(axs[0])
-
     plt.tight_layout()
     plt.show()
 
@@ -125,7 +105,6 @@ def plot_3D_integration_segments(t_vals, state_vals, phase_transitions=None, sho
                     color=phase_colors.get(phase_name, "gray"),
                 )
     else:
-        # Fallback: Plot whole segment
         ax.plot3D(
             x_vals,
             y_vals,
@@ -136,17 +115,13 @@ def plot_3D_integration_segments(t_vals, state_vals, phase_transitions=None, sho
         )
 
     if show_earth:
-        # Add Earth as a low-resolution wireframe sphere for efficiency
         earth_radius = 6371  # km
-        u = np.linspace(0, 2 * np.pi, 80)  # Low res: 20 longitude points
-        v = np.linspace(0, np.pi, 40)  # Low res: 10 latitude points
+        u = np.linspace(0, 2 * np.pi, 80)
+        v = np.linspace(0, np.pi, 40)
         x = earth_radius * np.outer(np.cos(u), np.sin(v))
         y = earth_radius * np.outer(np.sin(u), np.sin(v))
         z = earth_radius * np.outer(np.ones(np.size(u)), np.cos(v))
-        ax.plot_wireframe(x, y, z, color="blue", rstride=2, cstride=2)  # Strides skip lines for even less lag
-
-        # Optional: For a solid sphere (potentially laggier), replace plot_wireframe with:
-        # ax.plot_surface(x, y, z, color='lightblue', alpha=1)
+        ax.plot_wireframe(x, y, z, color="blue", rstride=2, cstride=2)
 
     ax.set_xlabel("X (km)")
     ax.set_ylabel("Y (km)")
