@@ -425,14 +425,15 @@ def plot_exhaust_flow_directions(time_value, structured_data, exaggerate_factor)
     plt.show()
 
 
-def standard_plot_vs_time(field_names: list, structured_array: np.ndarray):
+def standard_plot_vs_time(field_names: list, structured_array: np.ndarray, y_axis_name: str, title: str):
     fig, ax = plt.subplots()
 
     for field_name in field_names:
         ax.plot(structured_array["time"], structured_array[field_name], label=field_name)
 
     ax.set_xlabel("Time (s)")
-    ax.set_title(f"{field_names} vs Time")
+    ax.set_ylabel(y_axis_name)
+    ax.set_title(f"{title}")
     ax.grid(True)
     ax.legend()
     plt.show()
@@ -464,10 +465,14 @@ if __name__ == "__main__":
 
     # plot_gimbal_angles(array["time"], array["engine_gimbal_angles"])
 
-    # plot_exhaust_flow_directions(10.2, array, exaggerate_factor=300)
+    plot_exhaust_flow_directions(15, array, exaggerate_factor=30000)
 
-    standard_plot_vs_time(["desired_pitch", "current_pitch"], array)
+    # standard_plot_vs_time(["desired_pitch", "current_pitch"], array, "Pitch Angle (deg)", "Pitch Angle vs Time")
 
     # standard_plot_vs_time(["current_altitude", "orbital_vel"], array)
 
-    standard_plot_vs_time(["apoapsis_altitude", "periapsis_altitude", "current_altitude"], array)
+    # standard_plot_vs_time(["radial_vel", "tangential_vel", "orbital_vel"], array, "Velocity (m/s)", "Velocity vs Time")
+
+    # standard_plot_vs_time(
+    #     ["apoapsis_altitude", "periapsis_altitude", "current_altitude"], array, "Altitude (km)", "Altitude vs Time"
+    # )

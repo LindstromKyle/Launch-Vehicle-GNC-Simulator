@@ -207,12 +207,13 @@ class CoastPhase(Phase):
 class CircBurnPhase(Phase):
     def __init__(
         self,
-        peri_tolerance_factor: float = 0.85,
+        peri_tolerance_factor: float = 0.98,
         attitude_mode: str = "prograde",
         throttle: float = 1.0,  # Max/default throttle
         name: str = "Unnamed",
         min_throttle: float = 0.1,  # Engine minimum (prevent flameout/stability issues)
         throttle_kp: float = 20.0,  # Proportional gain; tune so error=0.05 -> throttle=1.0
+        target_eccentricity: float = 0.002,
     ):
         self.peri_tolerance_factor = peri_tolerance_factor
         self.attitude_mode = attitude_mode
@@ -220,6 +221,7 @@ class CircBurnPhase(Phase):
         self.name = name
         self.min_throttle = min_throttle
         self.throttle_kp = throttle_kp
+        self.target_eccentricity = target_eccentricity
 
     def is_complete(self, time: float, state_vector: np.ndarray, elements: dict | None) -> bool:
         if elements is None:
@@ -233,7 +235,7 @@ class CircBurnPhase(Phase):
         peri_ok = elements["periapsis_radius"] >= self.peri_tolerance_factor * elements["apoapsis_radius"]
 
         # # Enhanced checks
-        # ecc_ok = elements["eccentricity"] < 0.01  # Near-circular
+        ecc_ok = elements["eccentricity"] < self.target_eccentricity
         #
         # # Energy check similar to above
         # mu = self.mu
@@ -246,7 +248,7 @@ class CircBurnPhase(Phase):
         #
         # # Complete if peri ok AND ecc/energy stable
         # return peri_ok and ecc_ok and energy_ok
-        return peri_ok
+        return ecc_ok
 
     def get_setpoints(self, time: float, state_vector: np.ndarray, elements: dict) -> dict:
         if elements["apoapsis_radius"] == float("inf") or elements["periapsis_radius"] <= 0:

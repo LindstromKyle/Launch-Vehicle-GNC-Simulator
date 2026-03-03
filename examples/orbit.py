@@ -186,7 +186,7 @@ target_apo_alt = 300000.0
 target_peri_alt = 200000.0
 target_apoapsis = target_apo_alt + environment.earth_radius
 target_periapsis = target_peri_alt + environment.earth_radius
-simulation_end_time = separation_time + 5000
+simulation_end_time = separation_time + 5500
 burnout_quaternion = burnout_state_vector[6:10]
 burnout_position = burnout_state_vector[:3]
 burnout_z_unit_vector = rotate_vector_by_quaternion(np.array([0, 0, 1]), burnout_quaternion)
@@ -216,12 +216,13 @@ stage2_phases = [
         use_dynamic_threshold=True,
     ),
     CircBurnPhase(
-        peri_tolerance_factor=0.80,
+        peri_tolerance_factor=0.98,
         attitude_mode="prograde",
         throttle=1.0,
         name="Circularization",
         min_throttle=0.1,  # Optional; tune per engine
         throttle_kp=20.0,  # Optional; tune via sim runs
+        target_eccentricity=0.0011,
     ),
     TimeBasedPhase(end_time=simulation_end_time, attitude_mode="passive", throttle=0.0, name="Orbit"),
 ]
@@ -245,18 +246,6 @@ controller_stage2 = PIDAttitudeController(
     vehicle=stage_2,
 )
 
-# stage2_p = 1800
-# stage2_i = 0
-# stage2_d = 9500
-#
-# controller_stage2 = PIDAttitudeController(
-#     kp=np.array([stage2_p, stage2_p, 1.5 * stage2_p]),
-#     ki=np.array([stage2_i, stage2_i, 1.5 * stage2_i]),
-#     kd=np.array([stage2_d, stage2_d, 1.5 * stage2_d]),
-#     guidance=stage2_guidance,
-#     vehicle=stage_2,
-# )
-
 sim_stage2 = Simulator(
     vehicle=stage_2,
     environment=environment,
@@ -264,7 +253,7 @@ sim_stage2 = Simulator(
     mission_planner=stage2_planner,
     t_0=separation_time,
     t_final=simulation_end_time,  # Enough for orbit
-    delta_t=0.01,  # Larger step ok for vacuum
+    delta_t=0.2,
     log_interval=0.5,
     log_name="orbit",
 )
@@ -273,18 +262,18 @@ sim_stage2.add_controller(controller_stage2)
 print("\nSimulating Stage 2 to Orbit...")
 stage2_t_vals, stage2_state_vals, stage2_phase_transitions = sim_stage2.run()
 
-# # Combine phase transitions for plotting
-# all_phase_transitions = [(t, f"{name}") for t, name in stage1_phase_transitions] + [
-#     (t, f"{name}") for t, name in stage2_phase_transitions
-# ]
-#
-# # Combine t and state vals for plotting
-# all_t_vals = np.append(stage1_t_vals, stage2_t_vals)
-# all_state_vals = np.vstack((stage1_state_vals, stage2_state_vals))
-#
-# plot_3D_integration_segments(
-#     t_vals=all_t_vals,
-#     state_vals=all_state_vals,
-#     phase_transitions=all_phase_transitions,
-#     show_earth=True,
-# )
+# Combine phase transitions for plotting
+all_phase_transitions = [(t, f"{name}") for t, name in stage1_phase_transitions] + [
+    (t, f"{name}") for t, name in stage2_phase_transitions
+]
+
+# Combine t and state vals for plotting
+all_t_vals = np.append(stage1_t_vals, stage2_t_vals)
+all_state_vals = np.vstack((stage1_state_vals, stage2_state_vals))
+
+plot_3D_integration_segments(
+    t_vals=all_t_vals,
+    state_vals=all_state_vals,
+    phase_transitions=all_phase_transitions,
+    show_earth=True,
+)

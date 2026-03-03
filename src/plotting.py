@@ -94,14 +94,12 @@ def plot_3D_integration_segments(t_vals, state_vals, phase_transitions=None, sho
 
     # Define colors for phases
     phase_colors = {
-        "Initial Ascent": "blue",
-        "Kick": "green",
-        "Stage 1 Pitch Program": "yellow",
+        "Initial Ascent": "gray",
+        "Stage 1 Pitch Program": "magenta",
         "Stage 2 Ascent Burn": "orange",
-        "Coast": "purple",
-        "Circularization": "red",
-        "Orbit": "black",
-        "Semi-Gravity Turn Stage 1": "cyan",
+        "Coast": "red",
+        "Circularization": "black",
+        "Orbit": "green",
     }
 
     x_vals = state_vals[:, 0] / 1000
@@ -140,8 +138,8 @@ def plot_3D_integration_segments(t_vals, state_vals, phase_transitions=None, sho
     if show_earth:
         # Add Earth as a low-resolution wireframe sphere for efficiency
         earth_radius = 6371  # km
-        u = np.linspace(0, 2 * np.pi, 40)  # Low res: 20 longitude points
-        v = np.linspace(0, np.pi, 20)  # Low res: 10 latitude points
+        u = np.linspace(0, 2 * np.pi, 80)  # Low res: 20 longitude points
+        v = np.linspace(0, np.pi, 40)  # Low res: 10 latitude points
         x = earth_radius * np.outer(np.cos(u), np.sin(v))
         y = earth_radius * np.outer(np.sin(u), np.sin(v))
         z = earth_radius * np.outer(np.ones(np.size(u)), np.cos(v))

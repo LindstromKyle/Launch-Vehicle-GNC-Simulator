@@ -8,7 +8,7 @@
 
 - [Overview](#overview)
 - [Key Achievements](#key-achievements)
-- [Features & Technical Highlights](#features--technical-highlights)
+- [Technical Highlights](#technical-highlights)
 - [Results & Visualizations](#results--visualizations)
 - [Future Extensions](#future-extensions)
 
@@ -22,7 +22,7 @@ This project is a modular, physics-based 6-DoF rocket ascent simulator that mode
 - Realistic environment (J2 gravity, rotating Earth, AoA-dependent drag)  
 - Phase-based mission sequencing with automatic transitions  
 
-The simulation successfully reaches user-defined orbits (e.g. 200 × 300 km) using realistic control and guidance laws.
+The simulation successfully reaches user-defined orbits (e.g. 275 × 290 km) using realistic control and guidance laws.
 
 ## Key Achievements
 
@@ -38,12 +38,12 @@ The simulation successfully reaches user-defined orbits (e.g. 200 × 300 km) usi
   - Quaternion-based attitude with angular velocity propagation  
   - Least-squares gimbal allocation and RCS assist  
   - Dynamic center-of-mass & gimbal arm length from propellant depletion 
-  - RK4 integration with normalized quaternions  
+  - Verlet integration with normalized quaternions  
 
 - **Guidance & Control**  
   - Powered Explicit Guidance (PEG) solving real-time burn direction & throttle  
   - Programmed pitch maneuver for initial gravity turn 
-  - PID attitude controller with quaternion error, gain scheduling, anti-windup  
+  - PID attitude controller with quaternion error and gain scheduling  
 
 - **Environment**  
   - Newtonian + J2 oblateness gravity  
@@ -52,16 +52,24 @@ The simulation successfully reaches user-defined orbits (e.g. 200 × 300 km) usi
 
 - **Mission Sequencing**  
   - Phase objects (TimeBased, Kick, PEG, Coast, CircBurn, etc.)  
-  - Automatic completion checks (time, apoapsis reached, periapsis condition)  
+  - Automatic completion checks (time, apoapsis reached, eccentricity condition)  
   - Seamless hand-over between stages  
 
 ## Results & Visualizations
 
-The following plots serve as strong visual proof of realism and performance.
+The following visualizations serve as strong proof of realism and performance.
 
-### 3D Trajectory by Mission Phase + Earth Reference
+### 3D Trajectory by Mission Phase with Earth Reference
 
-![3D Trajectory with Phase Overlays and Earth](images/3d_trajectory_phases.png)
+![Orbit](readme_imgs/orbit.gif)
+
+### Engine Gimbal Angles During Gravity Turn
+
+![Engine_Gimbals](readme_imgs/Engine_Gimbal.png)
+
+### Stage 2 Altitude Profile
+
+![Altitude vs Time](readme_imgs/Stage2AltitudeVsTime.png)
 
 ### Altitude, Velocity & Acceleration Profiles
 
@@ -75,10 +83,6 @@ The following plots serve as strong visual proof of realism and performance.
 
 ![Orbital Elements Evolution](images/orbital_elements_convergence.png)
 
-**Typical final orbit** (example targets 200 × 300 km):  
-- Achieved apoapsis altitude: ~299–301 km  
-- Achieved periapsis altitude: ~199–202 km  
-- Final inclination close to launch latitude (small out-of-plane steering demonstrated)
 
 ## Future Extensions
 
