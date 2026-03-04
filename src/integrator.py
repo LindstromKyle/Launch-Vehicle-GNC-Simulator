@@ -1,14 +1,28 @@
-import logging
-
-from dynamics import calculate_dynamics
 import numpy as np
 from tqdm import tqdm
-from utils import quat_to_angle_axis, angle_axis_to_quat, quaternion_multiply
+
+from controller import Controller
+from dynamics import calculate_dynamics
+from environment import Environment
+from mission import MissionPlanner
+from utils import angle_axis_to_quat, quaternion_multiply
+from vehicle import Vehicle
 
 
 def integrate_rk4(
-    vehicle, environment, initial_state, t_0, t_final, delta_t, log_interval, controller, mission_planner
+    vehicle: Vehicle,
+    environment: Environment,
+    initial_state: np.ndarray,
+    t_0: float,
+    t_final: float,
+    delta_t: float,
+    log_interval: float,
+    controller: Controller,
+    mission_planner: MissionPlanner,
 ):
+    """
+    Classic RK4 integration loop
+    """
 
     # Initialize starting time and position
     t_values = [t_0]
@@ -16,14 +30,13 @@ def integrate_rk4(
     current_time = t_0
     current_state = initial_state.copy()
     last_logged_time = None
-    phase_transitions = []  # Collect transitions if planner provided
+    phase_transitions = []
 
     # Progress bar
     max_iterations = np.floor((t_final - t_0) / delta_t)
     p_bar = tqdm(total=max_iterations, desc="Processing", leave=True)
 
     while current_time < t_final:
-
         # Log dynamic variables every [log_interval] seconds of simulation time
         log_flag = False
         if last_logged_time is None or round(current_time - last_logged_time, 12) >= log_interval:
@@ -74,12 +87,11 @@ def integrate_rk4(
 
         # Update state and time
         weighted_average = (k_1 + 2 * k_2 + 2 * k_3 + k_4) / 6
+        current_time += h
 
         # If we hit the ground, don't change state
         if np.linalg.norm(current_state[:3]) >= environment.earth_radius:
             current_state += h * weighted_average
-
-        current_time += h
 
         # Clamp propellant
         current_state[13] = max(current_state[13], 0)
@@ -90,7 +102,6 @@ def integrate_rk4(
         # Append state and time to results
         t_values.append(current_time)
         state_values.append(current_state.copy())
-
         phase_transitions = mission_planner.get_phase_transitions()
 
         # Progress bar
@@ -101,20 +112,21 @@ def integrate_rk4(
 
 
 def integrate_verlet(
-    vehicle,
-    environment,
-    initial_state,
-    t_0,
-    t_final,
-    delta_t,
-    log_interval,
-    controller,
-    mission_planner,
+    vehicle: Vehicle,
+    environment: Environment,
+    initial_state: np.ndarray,
+    t_0: float,
+    t_final: float,
+    delta_t: float,
+    log_interval: float,
+    controller: Controller,
+    mission_planner: MissionPlanner,
 ):
     """
-    Pure Velocity Verlet
+    Pure Velocity Verlet integrator (conserves energy)
     """
 
+    # Initialize variables
     t_vals = [t_0]
     state_vals = [initial_state.copy()]
     current_time = t_0
@@ -122,20 +134,24 @@ def integrate_verlet(
     last_logged_time = None
     phase_transitions = []
 
+    # Progress bar
     max_iterations = int(np.floor((t_final - t_0) / delta_t))
     p_bar = tqdm(total=max_iterations, desc="Velocity Verlet", leave=True)
 
     while current_time < t_final:
+        # Logging
         log_flag = last_logged_time is None or round(current_time - last_logged_time, 12) >= log_interval
         if log_flag:
             last_logged_time = current_time
 
+        # Step size
         h = min(delta_t, t_final - current_time)
 
         # Get controls and current acceleration/torque
         setpoints = mission_planner.update(current_time, current_state, log_flag)
         controls = controller.update(current_time, current_state, setpoints, log_flag)
 
+        # Dynamics
         deriv_current = calculate_dynamics(
             time=current_time,
             state=current_state,
@@ -154,7 +170,7 @@ def integrate_verlet(
         # Full position update
         current_state[:3] += current_state[3:6] * h
 
-        # Exact quaternion update (constant ω over the step)
+        # Quaternion update
         omega = current_state[10:13]
         omega_norm = np.linalg.norm(omega)
         if omega_norm > 1e-12:
@@ -189,8 +205,8 @@ def integrate_verlet(
         current_state[3:6] += 0.5 * acc_new * h
         current_state[10:13] += 0.5 * ang_acc_new * h
 
+        # Append results
         current_time += h
-
         t_vals.append(current_time)
         state_vals.append(current_state.copy())
         phase_transitions = mission_planner.get_phase_transitions()

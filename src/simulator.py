@@ -1,19 +1,26 @@
 import logging
-from plotting import plot_3D_trajectory, plot_1D_position_velocity_acceleration
+
+from environment import Environment
 from integrator import integrate_rk4, integrate_verlet
+from mission import MissionPlanner
+from state import State
+from vehicle import Vehicle
 
 
 class Simulator:
+    """
+    Main driver class to run the simulation
+    """
 
     def __init__(
         self,
-        vehicle,
-        environment,
-        initial_state,
-        mission_planner,
-        t_0=0,
-        t_final=2000,
-        delta_t=0.5,
+        vehicle: Vehicle,
+        environment: Environment,
+        initial_state: State,
+        mission_planner: MissionPlanner,
+        t_0: float = 0,
+        t_final: float = 2000,
+        delta_t: float = 0.5,
         log_interval: float = 1,
         log_name: str = "simulation",
     ):
@@ -29,15 +36,25 @@ class Simulator:
         self.log_name = log_name
 
     def add_controller(self, controller):
+        """
+        Adds the selected attitude controller
+        """
         self.controller = controller
 
     def run(self):
+        """
+        Runs simulation loop
+        """
+
+        # Set up logging
         logging.basicConfig(
             filename=f"../logs/{self.log_name}.log",
             level=logging.INFO,
             format="[%(levelname)s] %(message)s",
             filemode="w",
         )
+
+        # Integrate
         t_vals, state_vals, phase_transitions = integrate_verlet(
             vehicle=self.vehicle,
             environment=self.environment,
@@ -51,11 +68,3 @@ class Simulator:
         )
 
         return t_vals, state_vals, phase_transitions
-
-    def plot_1D(self, t_vals, state_vals, axis):
-        # Plot 1D params
-        plot_1D_position_velocity_acceleration(t_vals, state_vals, axis, self.environment)
-
-    def plot_3D(self, t_vals, state_vals):
-        # Plot 3D Trajectory
-        plot_3D_trajectory(t_vals, state_vals)

@@ -1,12 +1,13 @@
 import logging
-from scipy.optimize import nnls  # Add this import
 import numpy as np
+
+from scipy.optimize import nnls
 from abc import ABC, abstractmethod
 
 from guidance import Guidance
 from state import State
 from utils import quaternion_multiply, quaternion_inverse, quat_to_angle_axis, rotate_vector_by_quaternion
-from vehicle import Vehicle, Falcon9SecondStage
+from vehicle import Vehicle
 
 
 class Controller(ABC):
@@ -15,23 +16,18 @@ class Controller(ABC):
     """
 
     @abstractmethod
-    def update(self, time: float, state: State, mission_planner_setpoints: dict, log_flag: bool) -> dict:
+    def update(self, time: float, state_vector: np.ndarray, mission_planner_setpoints: dict, log_flag: bool) -> dict:
         """
         Compute control inputs based on time and current state.
-
-        Args:
-            log_flag ():
-            mission_planner_setpoints ():
-            time: Current simulation time (s)
-            state: Current State object
-
-        Returns:
-            Dict with control outputs, e.g., {'gimbal_angles': np.array([pitch, yaw]), 'fin_deflections': dict(...)}
         """
         pass
 
 
 class PIDAttitudeController(Controller):
+    """
+    PID Controller Subclass
+    """
+
     def __init__(
         self,
         kp: np.ndarray,
@@ -40,27 +36,20 @@ class PIDAttitudeController(Controller):
         guidance: Guidance,
         vehicle: Vehicle,
     ):
-        """
-
-        Args:
-            kp ():
-            ki ():
-            kd ():
-            guidance ():
-            vehicle ():
-        """
+        # Copy PID gains to allow modification
         self.kp = kp.copy()
-        self.ki = ki.copy()  # Allow modification
+        self.ki = ki.copy()
         self.kd = kd.copy()
         self.guidance = guidance
-        self.integral_error = np.zeros(3)  # Accumulator for I term
+        self.integral_error = np.zeros(3)
         self.previous_error = np.zeros(3)
         self.previous_d_term = np.zeros(3)
-        self.vehicle = vehicle
         self.last_update_time = None
         self.prev_error_quat = np.array([1.0, 0.0, 0.0, 0.0])
+        self.vehicle = vehicle
 
     def update(self, time: float, state_vector: np.ndarray, mission_planner_setpoints: dict, log_flag: bool) -> dict:
+
         current_propellant_mass = state_vector[13]
         current_quaternion = state_vector[6:10]
         attitude_mode = mission_planner_setpoints.get("attitude_mode", "prograde")

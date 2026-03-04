@@ -1,13 +1,21 @@
+from environment import Environment
+
 import numpy as np
 import logging
+import warnings
 
 from utils import compute_quaternion_derivative, rotate_vector_by_quaternion, compute_orbital_elements
-import warnings
+from vehicle import Vehicle
 
 warnings.filterwarnings("error", category=RuntimeWarning)
 
 
-def calculate_dynamics(time, state, vehicle, environment, log_flag, controls):
+def calculate_dynamics(
+    time: float, state: np.ndarray, vehicle: Vehicle, environment: Environment, log_flag: bool, controls: dict
+):
+    """
+    Calculates linear and angular state derivatives, as well as mass flow rate
+    """
     position = state[0:3]
     velocity = state[3:6]
     quaternion = state[6:10]
@@ -15,14 +23,14 @@ def calculate_dynamics(time, state, vehicle, environment, log_flag, controls):
     propellant_mass = state[13]
 
     # Mass
-    vehicle_mass = vehicle.dry_mass + max(propellant_mass, 0)  # Clamp to avoid negative
+    vehicle_mass = vehicle.dry_mass + max(propellant_mass, 0)
 
     # Controller logic
     gimbal_angles = controls.get("engine_gimbal_angles")
     throttle = controls.get("throttle")
     desired_torque = controls.get("desired_torque")
 
-    # Forces
+    # Check throttle and remaining propellant
     if throttle > 0 and propellant_mass > 0:
         thrust_force, thrust_vector_torque = vehicle.thrust_vector(
             time, quaternion, gimbal_angles, throttle, propellant_mass
@@ -34,11 +42,13 @@ def calculate_dynamics(time, state, vehicle, environment, log_flag, controls):
         thrust_vector_torque = np.zeros(3)
         mass_flow_rate = 0.0
 
+    # Compute forces
     rcs_force, rcs_torque = vehicle.rcs_vector(quaternion, controls.get("rcs_levels", []))
     gravitational_force = environment.gravitational_force(position, vehicle_mass)
     drag_force = environment.drag_force(position, velocity, vehicle, quaternion)
     net_force = thrust_force + gravitational_force + drag_force + rcs_force
 
+    # f = ma
     acceleration = net_force / vehicle_mass
 
     # Quaternion dynamics
@@ -49,7 +59,6 @@ def calculate_dynamics(time, state, vehicle, environment, log_flag, controls):
     aerodynamic_torque = environment.aerodynamic_torque(position, velocity, quaternion, angular_velocity, vehicle)
     total_torque = thrust_vector_torque + aerodynamic_torque + rcs_torque
     angular_momentum = moment_of_inertia @ angular_velocity
-
     gyroscopic_reaction_torque = np.cross(angular_velocity, angular_momentum)
     angular_acceleration = np.linalg.inv(moment_of_inertia) @ (total_torque - gyroscopic_reaction_torque)
 

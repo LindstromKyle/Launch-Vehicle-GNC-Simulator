@@ -18,19 +18,15 @@ class Guidance(ABC):
     ) -> np.ndarray:
         """
         Compute the desired quaternion based on time and current state.
-
-        Args:
-            time (float): Current simulation time (s)
-            state_vector (np.ndarray): Current State object
-            mission_phase_parameters (dict):
-
-        Returns:
-            Desired quaternion [w, x, y, z]
         """
         pass
 
 
 class ModeBasedGuidance(Guidance):
+    """
+    Guidance
+    """
+
     def __init__(self, orbital_normal, environment):
         self.orbital_normal = orbital_normal
         self.environment = environment

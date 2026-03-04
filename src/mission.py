@@ -6,16 +6,30 @@ from utils import compute_orbital_elements, compute_time_to_apoapsis
 
 
 class Phase(ABC):
+    """
+    ABC for Phases. Subclasses implement setpoints and completion checks
+    """
+
     @abstractmethod
     def is_complete(self, time: float, state_vector: np.ndarray, elements: dict | None) -> bool:
+        """
+        Determines if the current phase is complete based on the current state
+        """
         pass
 
     @abstractmethod
     def get_setpoints(self, time: float, state_vector: np.ndarray, elements: dict) -> dict:
+        """
+        Returns the mission setpoints used by guidance to determine quaternion
+        """
         pass
 
 
 class TimeBasedPhase(Phase):
+    """
+    Simple phase that completes after a certain time has elapsed
+    """
+
     def __init__(self, end_time: float, attitude_mode: str, throttle: float = 1.0, name: str = "Unnamed"):
         self.end_time = end_time
         self.attitude_mode = attitude_mode
@@ -27,120 +41,6 @@ class TimeBasedPhase(Phase):
 
     def get_setpoints(self, time: float, state_vector: np.ndarray, elements: dict) -> dict:
         return {"throttle": self.throttle, "attitude_mode": self.attitude_mode}
-
-
-class KickPhase(Phase):
-    def __init__(
-        self,
-        end_time: float,
-        kick_direction: np.ndarray,
-        kick_angle_deg: float,
-        throttle: float = 1.0,
-        name: str = "Unnamed",
-    ):
-        self.end_time = end_time
-        self.attitude_mode = "kick"
-        self.throttle = throttle
-        self.kick_direction = kick_direction
-        self.kick_angle_deg = kick_angle_deg
-        self.kick_angle_rad = np.deg2rad(self.kick_angle_deg)
-        self.name = name
-
-    def is_complete(self, time: float, state_vector: np.ndarray, elements: dict | None) -> bool:
-        return time >= self.end_time
-
-    def get_setpoints(self, time: float, state_vector: np.ndarray, elements: dict) -> dict:
-        return {
-            "throttle": self.throttle,
-            "attitude_mode": self.attitude_mode,
-            "kick_direction": self.kick_direction,
-            "kick_angle_rad": self.kick_angle_rad,
-        }
-
-
-class TargetApoapsisPhase(Phase):
-    def __init__(
-        self, target_apoapsis: float, attitude_mode: str = "prograde", throttle: float = 1.0, name: str = "Unnamed"
-    ):
-        self.target_apoapsis = target_apoapsis
-        self.attitude_mode = attitude_mode
-        self.throttle = throttle
-        self.name = name
-
-    def is_complete(self, time: float, state_vector: np.ndarray, elements: dict | None) -> bool:
-        return (elements is not None) and (elements["apoapsis_radius"] >= self.target_apoapsis)
-
-    def get_setpoints(self, time: float, state_vector: np.ndarray, elements: dict) -> dict:
-        return {"throttle": self.throttle, "attitude_mode": self.attitude_mode}
-
-
-class PitchToApoapsisPhase(Phase):
-
-    def __init__(
-        self,
-        initial_pitch_deg: float,
-        base_pitch_rate_deg_per_sec: float,
-        target_apoapsis: float,
-        min_pitch_deg: float = 20.0,
-        throttle: float = 1.0,
-        name: str = "Pitch to Apoapsis",
-        kp_apo: float = 1.0,
-        kp_vel: float = 0.8,
-        vel_weight: float = 0.5,
-        vel_threshold_factor: float = 0.95,
-    ):
-        self.initial_pitch_deg = initial_pitch_deg
-        self.base_pitch_rate_deg_per_sec = base_pitch_rate_deg_per_sec
-        self.target_apoapsis = target_apoapsis
-        self.min_pitch_deg = min_pitch_deg
-        self.throttle = throttle
-        self.name = name
-        self.attitude_mode = "pitch_to_apoapsis"
-        self.kp_apo = kp_apo
-        self.kp_vel = kp_vel
-        self.vel_weight = vel_weight
-        self.vel_threshold_factor = vel_threshold_factor
-
-    def is_complete(self, time: float, state_vector: np.ndarray, elements: dict | None) -> bool:
-        if elements is None:
-            return False
-
-        # apoapsis check
-        apo_ok = elements["apoapsis_radius"] >= self.target_apoapsis
-
-        #  Velocity targeting
-        mu = self.mu  # Now available
-        a = elements["semi_major_axis"]
-        r_apo = elements["apoapsis_radius"]
-
-        if a == float("inf") or r_apo == float("inf"):
-            return apo_ok  # Fallback to just apoapsis
-
-        # Projected velocity at apoapsis
-        v_apo_projected = np.sqrt(mu * (2 / r_apo - 1 / a)) if a > 0 else 0.0  # Handle elliptic
-
-        # Circular velocity at apoapsis altitude
-        v_circ = np.sqrt(mu / r_apo)
-
-        # Threshold
-        vel_threshold = 0.95
-        vel_ok = v_apo_projected >= vel_threshold * v_circ
-
-        return apo_ok and vel_ok
-
-    def get_setpoints(self, time: float, state_vector: np.ndarray, elements: dict) -> dict:
-        return {
-            "throttle": self.throttle,
-            "attitude_mode": self.attitude_mode,
-            "initial_pitch_deg": self.initial_pitch_deg,
-            "base_pitch_rate_deg_per_sec": self.base_pitch_rate_deg_per_sec,
-            "min_pitch_deg": self.min_pitch_deg,
-            "kp_apo": self.kp_apo,
-            "kp_vel": self.kp_vel,
-            "vel_weight": self.vel_weight,
-            "target_apoapsis": self.target_apoapsis,
-            "vel_threshold_factor": self.vel_threshold_factor,
-        }
 
 
 class CoastPhase(Phase):
