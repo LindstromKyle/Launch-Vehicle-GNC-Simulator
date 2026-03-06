@@ -1,33 +1,58 @@
 import logging
-from abc import ABC, abstractmethod
 import numpy as np
 
+from abc import ABC, abstractmethod
+
+from environment import Environment
 from utils import compute_orbital_elements, compute_time_to_apoapsis
+from vehicle import Vehicle
 
 
 class Phase(ABC):
     """
-    ABC for Phases. Subclasses implement setpoints and completion checks
+    Abstract base class for mission phases. Each phase defines its attitude/throttle setpoints and when it should end.
     """
 
     @abstractmethod
     def is_complete(self, time: float, state_vector: np.ndarray, elements: dict | None) -> bool:
         """
-        Determines if the current phase is complete based on the current state
+        Check if this phase should end based on current time and state.
+
+        Args:
+            time: Current simulation time (seconds)
+            state_vector: Full state vector
+            elements: Orbital elements dictionary
+
+        Returns:
+            True if the phase is finished, False otherwise
         """
         pass
 
     @abstractmethod
     def get_setpoints(self, time: float, state_vector: np.ndarray, elements: dict) -> dict:
         """
-        Returns the mission setpoints used by guidance to determine quaternion
+        Return the control setpoints for this phase.
+
+        Args:
+            time: Current simulation time (seconds)
+            state_vector: Full state vector
+            elements: Orbital elements dictionary
+
+        Returns:
+            Dictionary of setpoints (attitude_mode, throttle, etc.)
         """
         pass
 
 
 class TimeBasedPhase(Phase):
     """
-    Simple phase that completes after a certain time has elapsed
+    Phase that ends after a fixed amount of time has passed.
+
+    Args:
+        end_time: Simulation time when this phase should finish (s)
+        attitude_mode: Desired attitude mode string
+        throttle: Throttle level (0.0 to 1.0)
+        name: Name of the phase
     """
 
     def __init__(self, end_time: float, attitude_mode: str, throttle: float = 1.0, name: str = "Unnamed"):
@@ -44,6 +69,18 @@ class TimeBasedPhase(Phase):
 
 
 class CoastPhase(Phase):
+    """
+    Coast phase that ends when close to apoapsis (or when circularization burn should start).
+
+    Args:
+        time_to_apo_threshold: Time (s) remaining to apoapsis to trigger end
+        attitude_mode: Desired attitude during coast
+        throttle: TODO: should always be zero?
+        name: Name of the phase
+        buffer: Extra time margin for burn preparation (s)
+        use_dynamic_threshold: Whether to estimate burn time dynamically
+    """
+
     def __init__(
         self,
         time_to_apo_threshold: float = 30.0,
@@ -72,7 +109,6 @@ class CoastPhase(Phase):
             or elements.get("apoapsis_radius") == float("inf")
             or elements["semi_major_axis"] <= 0
         ):
-            # Fallback to fixed threshold for hyperbolic/elliptic edge cases
             time_to_apo = compute_time_to_apoapsis(position, velocity, elements, self.mu)
             return time_to_apo <= self.time_to_apo_threshold
 
@@ -92,7 +128,7 @@ class CoastPhase(Phase):
         ve = self.vehicle.average_isp * 9.80665
         T = self.vehicle.base_thrust_magnitude
         if T <= 0 or ve <= 0 or m0 <= 0:
-            return False  # Invalid - fallback
+            return False
 
         burn_time = (m0 * ve / T) * (1 - np.exp(-delta_v / ve))
         half_burn = burn_time / 2 + self.buffer
@@ -105,11 +141,24 @@ class CoastPhase(Phase):
 
 
 class CircBurnPhase(Phase):
+    """
+    Circularization burn phase — raises periapsis to target altitude.
+
+    Args:
+        peri_tolerance_factor: Fraction of target periapsis considered "close enough"
+        attitude_mode: Attitude mode to hold while burning
+        throttle: Maximum throttle level
+        name: Name of the phase
+        min_throttle: Minimum throttle during fine control
+        throttle_kp: Proportional gain for throttle adjustment
+        target_eccentricity: Desired final eccentricity
+    """
+
     def __init__(
         self,
         peri_tolerance_factor: float = 0.98,
         attitude_mode: str = "prograde",
-        throttle: float = 1.0,  # Max/default throttle
+        throttle: float = 1.0,
         name: str = "Unnamed",
         min_throttle: float = 0.1,
         throttle_kp: float = 20.0,
@@ -127,7 +176,7 @@ class CircBurnPhase(Phase):
         if elements is None:
             return False
 
-        # TODO: better way of doing this - currently checking for 1000km apoapsis
+        # TODO: better way of doing this - currently checking for 1000km apoapsis meaning we missed the cutoff
         if elements["apoapsis_radius"] > 6371000 + 1000000:
             return True
 
@@ -156,6 +205,18 @@ class CircBurnPhase(Phase):
 
 
 class ProgrammedPitchPhase(Phase):
+    """
+    Phase that performs a smooth pitch-over maneuver from initial to final pitch angle.
+
+    Args:
+        end_time: Simulation time when this phase should end (s)
+        initial_pitch_deg: Starting pitch angle from vertical (degrees)
+        final_pitch_deg: Ending pitch angle from vertical (degrees)
+        kick_direction: Direction of the horizontal kick (default = east [0,1,0])
+        throttle: Throttle level (0.0–1.0)
+        name: Name of the phase
+    """
+
     def __init__(
         self,
         end_time: float,
@@ -187,6 +248,22 @@ class ProgrammedPitchPhase(Phase):
 
 
 class PEGPhase(Phase):
+    """
+    Powered Explicit Guidance phase. Uses iterative PEG algorithm to steer toward specified apoapsis/periapsis.
+
+    Args:
+        target_apoapsis: Desired apoapsis radius (m)
+        target_periapsis: Desired periapsis radius (m)
+        target_inclination: Target inclination (degrees)
+        apo_tolerance: Acceptable error in apoapsis (m)
+        peri_tolerance: Acceptable error in periapsis (m)
+        min_throttle: Minimum throttle during terminal guidance
+        throttle_kp: Proportional gain for throttle adjustment near target
+        throttle_threshold_factor: Scaling factor for when to reduce throttle
+        throttle: Maximum/nominal throttle level
+        name: Name of the phase
+    """
+
     def __init__(
         self,
         target_apoapsis: float,
@@ -259,7 +336,17 @@ class PEGPhase(Phase):
 
 
 class MissionPlanner:
-    def __init__(self, phases: list[Phase], environment, vehicle, start_time: float = 0.0):
+    """
+    Manages mission phases and provides current setpoints to guidance/controller.
+
+    Args:
+        phases: Ordered list of Phase objects
+        environment: Environment instance
+        vehicle: Vehicle instance
+        start_time: Simulation start time
+    """
+
+    def __init__(self, phases: list[Phase], environment: Environment, vehicle: Vehicle, start_time: float = 0.0):
         self.phases = phases
         self.current_phase_idx = 0
         self.current_phase = phases[0]
@@ -276,6 +363,17 @@ class MissionPlanner:
             phase.vehicle = self.vehicle
 
     def update(self, time: float, state_vector: np.ndarray, log_flag: bool) -> dict:
+        """
+        Get current phase setpoints and check for phase transitions.
+
+        Args:
+            time: Current simulation time (seconds)
+            state_vector: Full state vector
+            log_flag: Whether to log status this step
+
+        Returns:
+            Dictionary of current setpoints for guidance and controller
+        """
         position = state_vector[0:3]
         velocity = state_vector[3:6]
         elements = compute_orbital_elements(position, velocity, self.mu)
@@ -339,4 +437,10 @@ class MissionPlanner:
         return setpoints
 
     def get_phase_transitions(self) -> list[tuple[float, str]]:
+        """
+        Return list of phase change events for plotting/analysis.
+
+        Returns:
+            List of (time, phase_name) tuples
+        """
         return self.phase_transitions

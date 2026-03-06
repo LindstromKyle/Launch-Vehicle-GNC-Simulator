@@ -1,20 +1,30 @@
-from environment import Environment
-
 import numpy as np
 import logging
 import warnings
 
-from utils import compute_quaternion_derivative, rotate_vector_by_quaternion, compute_orbital_elements
+from environment import Environment
 from vehicle import Vehicle
+from utils import compute_quaternion_derivative, rotate_vector_by_quaternion, compute_orbital_elements
 
 warnings.filterwarnings("error", category=RuntimeWarning)
 
 
 def calculate_dynamics(
     time: float, state: np.ndarray, vehicle: Vehicle, environment: Environment, log_flag: bool, controls: dict
-):
+) -> np.ndarray:
     """
-    Calculates linear and angular state derivatives, as well as mass flow rate
+    Calculates linear and angular state derivatives, as well as mass flow rate.
+
+    Args:
+        time: Current simulation time (seconds)
+        state: Full state vector [position, velocity, quaternion, angular_velocity, propellant_mass]
+        vehicle: Vehicle object containing mass, thrust, inertia, etc.
+        environment: Environment object with gravity, drag, etc.
+        log_flag: Whether to write detailed logging this timestep
+        controls: Dictionary of control inputs (throttle, gimbal angles, RCS levels, etc.)
+
+    Returns:
+        Derivatives of the state vector (same shape as state)
     """
     position = state[0:3]
     velocity = state[3:6]

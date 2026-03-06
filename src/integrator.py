@@ -1,4 +1,5 @@
 import numpy as np
+
 from tqdm import tqdm
 
 from controller import Controller
@@ -19,11 +20,27 @@ def integrate_rk4(
     log_interval: float,
     controller: Controller,
     mission_planner: MissionPlanner,
-):
+) -> tuple[np.ndarray, np.ndarray, list]:
     """
-    Classic RK4 integration loop
-    """
+    Integrate the rocket's state using the classical Runge-Kutta 4th order method.
 
+    Args:
+        vehicle: Vehicle model instance
+        environment: Environment model instance
+        initial_state: Initial full state vector
+        t_0: Start time (seconds)
+        t_final: End time of simulation (seconds)
+        delta_t: Fixed time step size (seconds)
+        log_interval: How often to log detailed output (seconds)
+        controller: Attitude/thrust controller instance
+        mission_planner: Mission phase and setpoint manager
+
+    Returns:
+        Tuple containing:
+        - Array of time points
+        - Array of state vectors at each time point
+        - List of (time, phase_name) tuples for phase transitions
+    """
     # Initialize starting time and position
     t_values = [t_0]
     state_values = [initial_state]
@@ -121,11 +138,27 @@ def integrate_verlet(
     log_interval: float,
     controller: Controller,
     mission_planner: MissionPlanner,
-):
+) -> tuple[np.ndarray, np.ndarray, list]:
     """
-    Pure Velocity Verlet integrator (conserves energy)
-    """
+    Integrate the rocket's state using the Velocity Verlet method (symplectic integrator).
 
+    Args:
+        vehicle: Vehicle model instance
+        environment: Environment model instance
+        initial_state: Initial full state vector
+        t_0: Start time (seconds)
+        t_final: End time of simulation (seconds)
+        delta_t: Fixed time step size (seconds)
+        log_interval: How often to log detailed output (seconds)
+        controller: Attitude/thrust controller instance
+        mission_planner: Mission phase and setpoint manager
+
+    Returns:
+        Tuple containing:
+        - Array of time points
+        - Array of state vectors at each time point
+        - List of (time, phase_name) tuples for phase transitions
+    """
     # Initialize variables
     t_vals = [t_0]
     state_vals = [initial_state.copy()]

@@ -1,11 +1,29 @@
-from abc import abstractmethod, ABC
-
 import numpy as np
+
+from abc import abstractmethod, ABC
 
 from utils import rotate_vector_by_quaternion
 
 
 class Vehicle(ABC):
+    """
+    Abstract base class for rocket stages/vehicles.
+
+    Args:
+        dry_mass: Mass of the vehicle without propellant (kg)
+        initial_prop_mass: Initial propellant mass (kg)
+        base_thrust_magnitude: Thrust at full throttle (N)
+        average_isp: Specific impulse (seconds)
+        moment_of_inertia: 3×3 inertia tensor in body frame
+        base_drag_coefficient: Reference drag coefficient
+        drag_scaling_coefficient: Coefficient for angle-of-attack drag increase
+        cross_sectional_area: Reference area for drag calculation (m²)
+        engine_gimbal_limit_deg: Maximum engine gimbal angle (degrees)
+        engine_gimbal_arm_len: Distance from CoM to engines (m)
+        dry_com_z: Z-coordinate of center of mass with empty tanks (m)
+        prop_com_z: Z-coordinate of center of mass of propellant (m)
+    """
+
     def __init__(
         self,
         dry_mass: float,
@@ -51,37 +69,60 @@ class Vehicle(ABC):
         }
 
     # TODO: This needs to live somewhere else
-    def get_grid_fin_deflections(self, time, state):
+    def get_grid_fin_deflections(self, time: float | None, state: np.ndarray | None) -> dict[str, float]:
         """
-        Placeholder for future control logic.
-        Return a dict of surface angles (in radians).
+        Placeholder for future grid fin / control surface deflection logic.
+
+        Args:
+            time: Current simulation time (unused in placeholder)
+            state: Current state vector (unused in placeholder)
+
+        Returns:
+            Dictionary of fin deflection angles (radians)
         """
         return self.grid_fin_deflections
 
     @abstractmethod
-    def _setup_propulsion_system(self):
-        """Stage-specific engine configuration (positions, count, etc)."""
+    def _setup_propulsion_system(self) -> None:
+        """Stage-specific engine and RCS configuration (positions, count, etc.)."""
         pass
 
     def get_gimbal_arm(self, propellant_mass: float) -> float:
+        """
+        Compute current lever arm from CoM to engines based on propellant remaining.
+
+        Args:
+            propellant_mass: Current propellant mass (kg)
+
+        Returns:
+            Z-coordinate of engines relative to current CoM (m)
+        """
         total_mass = self.dry_mass + propellant_mass
         if total_mass <= 0:
             return self.dry_com_z
         com_z = (self.dry_mass * self.dry_com_z + propellant_mass * self.prop_com_z) / total_mass
         return com_z
 
-    def thrust_vector(self, time, quaternion, gimbal_angles_list, throttle: float = 1.0, propellant_mass: float = 0.0):
+    def thrust_vector(
+        self,
+        time: float,
+        quaternion: np.ndarray,
+        gimbal_angles_list: list[list[float]],
+        throttle: float = 1.0,
+        propellant_mass: float = 0.0,
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
-        Compute total thrust force and torque from all engines.
+        Compute total thrust force (inertial) and torque (body) from all engines.
+
         Args:
-            time: Simulation time (s)
+            time: Current simulation time (s)
             quaternion: Current attitude quaternion [w, x, y, z]
-            gimbal_angles_list: List of [pitch, yaw] angles (rad) for each engine
-            throttle: Throttle level (0 to 1)
-            propellant_mass: Current propellant mass (kg) for dynamic CoM
+            gimbal_angles_list: List of [pitch, yaw] angles for each engine (rad)
+            throttle: Throttle level (0.0 to 1.0)
+            propellant_mass: Current propellant mass (kg)
+
         Returns:
-            thrust_vector_force: Total thrust force in inertial frame (N)
-            thrust_vector_torque: Total torque in body frame (N·m)
+            Tuple of (total thrust force in inertial frame, total torque in body frame)
         """
         if throttle <= 0 or len(gimbal_angles_list) != self.num_engines:
             return np.zeros(3), np.zeros(3)
@@ -114,13 +155,30 @@ class Vehicle(ABC):
 
         return thrust_force, thrust_vector_torque
 
-    def get_thrust_magnitude(self, time, throttle: float = 1.0):
+    def get_thrust_magnitude(self, time: float, throttle: float = 1.0) -> float:
         """
-        Compute total thrust magnitude.
+        Compute total thrust magnitude at given throttle level.
+
+        Args:
+            time: Current simulation time (unused here)
+            throttle: Throttle level (0.0 to 1.0)
+
+        Returns:
+            Total thrust force magnitude (N)
         """
         return self.base_thrust_magnitude * max(min(throttle, 1.0), 0.0)
 
-    def rcs_vector(self, quaternion, rcs_levels):
+    def rcs_vector(self, quaternion: np.ndarray, rcs_levels: list[float]) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Compute total RCS force (inertial) and torque (body) from all thrusters.
+
+        Args:
+            quaternion: Current attitude quaternion [w, x, y, z]
+            rcs_levels: List of throttle levels (0.0–1.0) for each RCS thruster
+
+        Returns:
+            Tuple of (total RCS force in inertial frame, total RCS torque in body frame)
+        """
         if not self.rcs_thrusters or len(rcs_levels) == 0:
             return np.zeros(3), np.zeros(3)
 
@@ -139,7 +197,11 @@ class Vehicle(ABC):
 
 
 class Falcon9FirstStage(Vehicle):
-    def _setup_propulsion_system(self):
+    """
+    Falcon 9 first stage. Implements 9 merlin engine layout.
+    """
+
+    def _setup_propulsion_system(self) -> None:
         self.num_engines = 9
         self.thrust_per_engine = self.base_thrust_magnitude / self.num_engines
         self.mdot_per_engine = self.mdot_max / self.num_engines
@@ -154,7 +216,11 @@ class Falcon9FirstStage(Vehicle):
 
 
 class Falcon9SecondStage(Vehicle):
-    def _setup_propulsion_system(self):
+    """
+    Falcon 9 second stage. Implements single merlin vacuum engine and 8 RCS thrusters.
+    """
+
+    def _setup_propulsion_system(self) -> None:
         self.num_engines = 1
         self.thrust_per_engine = self.base_thrust_magnitude
         self.mdot_per_engine = self.mdot_max
@@ -165,7 +231,7 @@ class Falcon9SecondStage(Vehicle):
 
         self._setup_rcs()
 
-    def _setup_rcs(self):
+    def _setup_rcs(self) -> None:
         rcs_max_thrust = 2000.0
         rcs_radius = 1.5
         rcs_arm = 5.0

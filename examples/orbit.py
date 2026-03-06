@@ -121,6 +121,7 @@ orbital_normal /= np.linalg.norm(orbital_normal)
 # Guidance
 stage1_guidance = ModeBasedGuidance(orbital_normal=orbital_normal, environment=environment)
 
+# Controller gains
 stage1_p = 6e3
 stage1_i = 0.1
 stage1_d = 2e5

@@ -1,9 +1,14 @@
 import numpy as np
 
 from utils import rotate_vector_by_quaternion
+from vehicle import Vehicle
 
 
 class Environment:
+    """
+    Models the physical environment: gravity (including J2), atmosphere, drag, and aerodynamic torques.
+    """
+
     def __init__(self):
         self.earth_radius = 6371000
         self.earth_mass = 5.972e24
@@ -11,7 +16,17 @@ class Environment:
         self.earth_rotation_rate = 7.292115e-5  # rad/s (sidereal rotation)
         self.earth_angular_velocity_vector = np.array([0.0, 0.0, self.earth_rotation_rate])  # inertial
 
-    def gravitational_force(self, position, vehicle_mass):
+    def gravitational_force(self, position: np.ndarray, vehicle_mass: float) -> np.ndarray:
+        """
+        Compute gravitational force including J2 oblateness perturbation.
+
+        Args:
+            position: Position vector in inertial frame (m)
+            vehicle_mass: Current mass of the vehicle (kg)
+
+        Returns:
+            Gravitational force vector (N)
+        """
         orbital_radius = np.linalg.norm(position)
         if orbital_radius < 1e-3:
             return np.zeros(3)
@@ -30,15 +45,37 @@ class Environment:
         dz = factor * (5 * z**2 / orbital_radius**2 - 3) * z
         j2_perturbation = vehicle_mass * np.array([dx, dy, dz])  # Acceleration * mass = force
 
-        return newtonian_force + j2_perturbation
+        return newtonian_force  # + j2_perturbation
 
     def atmospheric_density(self, altitude: float) -> float:
+        """
+        Compute atmospheric density using simple exponential model.
+
+        Args:
+            altitude: Height above Earth's surface (m)
+
+        Returns:
+            Atmospheric density (kg/m³)
+        """
         sea_level_density = 1.225
         scale_height = 8500
         return sea_level_density * np.exp(-1 * altitude / scale_height)
 
-    def drag_force(self, position, velocity, vehicle, quaternion):
+    def drag_force(
+        self, position: np.ndarray, velocity: np.ndarray, vehicle: Vehicle, quaternion: np.ndarray
+    ) -> np.ndarray:
+        """
+        Compute aerodynamic drag force including angle-of-attack dependence.
 
+        Args:
+            position: Position vector in inertial frame (m)
+            velocity: Velocity vector in inertial frame (m/s)
+            vehicle: Vehicle instance (provides drag coefficients and area)
+            quaternion: Current attitude quaternion [w, x, y, z]
+
+        Returns:
+            Drag force vector in inertial frame (N)
+        """
         altitude = np.linalg.norm(position) - self.earth_radius
 
         # Protect against divide by zero
@@ -82,10 +119,29 @@ class Environment:
 
         return drag_magnitude * drag_unit_vector
 
-    def aerodynamic_torque(self, position, velocity, quaternion, angular_velocity, vehicle):
+    def aerodynamic_torque(
+        self,
+        position: np.ndarray,
+        velocity: np.ndarray,
+        quaternion: np.ndarray,
+        angular_velocity: np.ndarray,
+        vehicle: Vehicle,
+    ) -> np.ndarray:
+        """
+        Compute aerodynamic torque (currently placeholder - returns zeros).
+
+        Args:
+            position: Position vector in inertial frame (m)
+            velocity: Velocity vector in inertial frame (m/s)
+            quaternion: Current attitude quaternion [w, x, y, z]
+            angular_velocity: Angular velocity in body frame (rad/s)
+            vehicle: Vehicle instance (provides control surface info)
+
+        Returns:
+            Aerodynamic torque vector in body frame (N·m)
+        """
         # Get control surface deflections
         deflections = vehicle.get_grid_fin_deflections(time=None, state=None)
 
-        # Eventually add angle of attack math here for cross-sectional area
-        # Placeholder: return zero for now
+        # TODO: Eventually add angle of attack math here for cross-sectional area
         return np.zeros(3)

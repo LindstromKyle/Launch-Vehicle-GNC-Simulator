@@ -1,15 +1,18 @@
 import logging
-
 import numpy as np
-from abc import ABC, abstractmethod
 import cvxpy as cp
+
+from abc import ABC, abstractmethod
+
 from state import State
 from utils import compute_minimal_quaternion_rotation, compute_orbital_elements
+from environment import Environment
 
 
 class Guidance(ABC):
     """
-    Base class for guidance systems. Subclasses compute desired quaternion over time.
+    Base class for guidance systems that compute desired attitude over time. Subclasses must implement
+    get_desired_quaternion().
     """
 
     @abstractmethod
@@ -18,16 +21,28 @@ class Guidance(ABC):
     ) -> np.ndarray:
         """
         Compute the desired quaternion based on time and current state.
+
+        Args:
+            time: Current simulation time (seconds)
+            state_vector: Full state vector [position, velocity, quaternion, ang_vel, prop_mass]
+            mission_phase_parameters: Dictionary of current mission phase setpoints
+
+        Returns:
+            Desired quaternion [w, x, y, z] (normalized)
         """
         pass
 
 
 class ModeBasedGuidance(Guidance):
     """
-    Guidance
+    Guidance system that selects attitude mode based on mission phase setpoints.
+
+    Args:
+        orbital_normal: Unit vector normal to the orbital plane (used for horizontal reference)
+        environment: Environment instance
     """
 
-    def __init__(self, orbital_normal, environment):
+    def __init__(self, orbital_normal: np.ndarray, environment: Environment):
         self.orbital_normal = orbital_normal
         self.environment = environment
         self.current_attitude_mode = None
@@ -36,6 +51,17 @@ class ModeBasedGuidance(Guidance):
     def get_desired_quaternion(
         self, time: float, state_vector: np.ndarray, mission_planner_setpoints: dict
     ) -> np.ndarray:
+        """
+        Compute desired quaternion according to current attitude mode.
+
+        Args:
+            time: Current simulation time (seconds)
+            state_vector: Full state vector [pos, vel, quat, ang_vel, prop_mass]
+            mission_planner_setpoints: Current phase setpoints from mission planner
+
+        Returns:
+            Desired quaternion [w, x, y, z] (normalized)
+        """
         position = state_vector[:3]
         velocity = state_vector[3:6]
         radial_unit_vector = position / np.linalg.norm(position)

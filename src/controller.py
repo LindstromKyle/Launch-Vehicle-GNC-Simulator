@@ -5,27 +5,44 @@ from scipy.optimize import nnls
 from abc import ABC, abstractmethod
 
 from guidance import Guidance
-from state import State
 from utils import quaternion_multiply, quaternion_inverse, quat_to_angle_axis, rotate_vector_by_quaternion
 from vehicle import Vehicle
 
 
 class Controller(ABC):
     """
-    Base class for controllers. Subclasses implement control logic.
+    Abstract base class for all attitude and thrust controllers. Subclasses must implement the update() method to
+    compute control inputs.
     """
 
     @abstractmethod
     def update(self, time: float, state_vector: np.ndarray, mission_planner_setpoints: dict, log_flag: bool) -> dict:
         """
-        Compute control inputs based on time and current state.
+        Compute control inputs for the current time step.
+
+        Args:
+            time: Current simulation time (seconds)
+            state_vector: Full state vector [pos, vel, quat, ang_vel, prop_mass]
+            mission_planner_setpoints: Dictionary of current mission setpoints
+            log_flag: Whether to log detailed information this step
+
+        Returns:
+            Dictionary containing control commands (throttle, gimbal angles, etc.)
         """
         pass
 
 
 class PIDAttitudeController(Controller):
     """
-    PID Controller Subclass
+    PID-based attitude controller that computes gimbal angles and RCS commands. Uses quaternion error and PID control
+    to generate desired body torque, then allocates it to engine gimbals and RCS thrusters.
+
+    Args:
+        kp: Proportional gain vector [x, y, z] (rad/s)
+        ki: Integral gain vector [x, y, z] (rad/s²)
+        kd: Derivative gain vector [x, y, z] (rad/s)
+        guidance: Guidance instance used to compute desired quaternion
+        vehicle: Vehicle instance providing engine and RCS configuration
     """
 
     def __init__(
@@ -49,7 +66,19 @@ class PIDAttitudeController(Controller):
         self.vehicle = vehicle
 
     def update(self, time: float, state_vector: np.ndarray, mission_planner_setpoints: dict, log_flag: bool) -> dict:
+        """
+        Main control loop step: compute gimbal angles, RCS levels, and throttle.
 
+        Args:
+            time: Current simulation time (seconds)
+            state_vector: Full 14-element state vector
+            mission_planner_setpoints: Current mission phase setpoints
+            log_flag: True if detailed logging should occur this step
+
+        Returns:
+            Dictionary with keys: desired_torque, engine_gimbal_angles, throttle,
+                                 propellant_mass, rcs_levels
+        """
         current_propellant_mass = state_vector[13]
         current_quaternion = state_vector[6:10]
         attitude_mode = mission_planner_setpoints.get("attitude_mode", "prograde")
@@ -202,6 +231,19 @@ class PIDAttitudeController(Controller):
     def get_actuator_commands(
         self, desired_torque: np.ndarray, effective_thrust_e: float, gimbal_arm: float
     ) -> tuple[list, np.ndarray]:
+        """
+        Allocate desired torque to engine gimbals and RCS thrusters.
+
+        Args:
+            desired_torque: Desired control torque in body frame (N·m)
+            effective_thrust_e: Effective thrust level for torque calculation (N)
+            gimbal_arm: Current lever arm from CoM to engine plane (m)
+
+        Returns:
+            Tuple containing:
+                - list of [pitch, yaw] gimbal angles (rad) for each engine
+                - array of RCS throttle levels (0 to 1) for each RCS thruster
+        """
         sin_lim = np.sin(self.vehicle.engine_gimbal_limit_rad)
         num_engines = self.vehicle.num_engines
         num_gimbal_dofs = 2 * num_engines
@@ -211,21 +253,21 @@ class PIDAttitudeController(Controller):
             pos = self.vehicle.engines[i]["position"].copy()
             pos[2] = -gimbal_arm
 
-            # Pitch dof (affects fy = -effective_thrust_e * sin_pitch)
+            # Pitch dof
             delta_f_pitch = np.array([0.0, -effective_thrust_e, 0.0])
             torque_pitch = np.cross(pos, delta_f_pitch)
             A[:, 2 * i] = torque_pitch
 
-            # Yaw dof (affects fx = effective_thrust_e * sin_yaw)
+            # Yaw dof
             delta_f_yaw = np.array([effective_thrust_e, 0.0, 0.0])
             torque_yaw = np.cross(pos, delta_f_yaw)
             A[:, 2 * i + 1] = torque_yaw
 
-        # Solve for u = [sin_pitch1, sin_yaw1, ..., sin_pitchN, sin_yawN]
+        # Solve least-squares for gimbal commands
         u, _, _, _ = np.linalg.lstsq(A, desired_torque, rcond=None)
         u_clipped = np.clip(u, -sin_lim, sin_lim)
 
-        # Compute gimbal angles
+        # Convert to angles
         gimbal_angles_list = []
         for i in range(num_engines):
             sin_pitch = u_clipped[2 * i]
@@ -234,10 +276,9 @@ class PIDAttitudeController(Controller):
             yaw = np.arcsin(sin_yaw)
             gimbal_angles_list.append([pitch, yaw])
 
-        # Compute achieved torque from gimbals
         achieved_torque = np.dot(A, u_clipped)
 
-        # RCS allocation if available
+        # RCS allocation for residual torque
         if self.vehicle.rcs_thrusters:
             num_rcs = len(self.vehicle.rcs_thrusters)
             A_rcs = np.zeros((3, num_rcs))
@@ -247,12 +288,10 @@ class PIDAttitudeController(Controller):
                 A_rcs[:, j] = torque
 
             residual = desired_torque - achieved_torque
-            # Clean up tiny floating-point noise in residual (set near-zero to exact zero)
             residual = np.where(np.abs(residual) < 1e-12, 0.0, residual)
 
             rcs_levels, _ = nnls(A_rcs, residual)
 
-            # Handle cases where levels > 1 by scaling
             if np.any(rcs_levels > 1):
                 max_level = np.max(rcs_levels)
                 rcs_levels *= 1.0 / max_level

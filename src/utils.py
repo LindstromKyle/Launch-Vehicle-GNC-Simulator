@@ -1,40 +1,55 @@
 import numpy as np
-from scipy.spatial.transform import Rotation
 import warnings
+
+from scipy.spatial.transform import Rotation
 
 warnings.filterwarnings("error", category=RuntimeWarning)
 
 
-def compute_acceleration(t_vals, velocity_vals):
+def compute_acceleration(t_vals: np.ndarray, velocity_vals: np.ndarray) -> np.ndarray:
+    """
+    Compute acceleration from velocity.
+
+    Args:
+        t_vals: Array of time points (s)
+        velocity_vals: Array of velocity values (m/s)
+
+    Returns:
+        Array of acceleration values (m/s²)
+    """
     acceleration_vals = np.gradient(velocity_vals, t_vals)
     return acceleration_vals
 
 
-def rotate_vector_by_quaternion(vector, quaternion):
+def rotate_vector_by_quaternion(vector: np.ndarray, quaternion: np.ndarray) -> np.ndarray:
     """
-    Rotate a vector from body frame to ECI frame using a quaternion.
-    Args:
-        vector: 3D numpy array in body frame
-        quaternion: Quaternion [w, x, y, z] representing ECI←body rotation
+    Rotate a vector from body frame to inertial frame using a quaternion.
 
-    returns: Rotated vector in ECI frame
+    Args:
+        vector: 3D vector in body frame
+        quaternion: Quaternion [w, x, y, z]
+
+    Returns:
+        Rotated vector in inertial (ECI) frame
     """
-    # Reorder quaternion to match scipy's format: [q1, q2, q3, q0]
+    # Reorder quaternion to match scipy's format: [x, y, z, w]
     q = np.array([quaternion[1], quaternion[2], quaternion[3], quaternion[0]])
     rotation = Rotation.from_quat(q)
     return np.round(rotation.apply(vector), 4)
 
 
-def get_rotated_basis_from_quat(quaternion, basis=None):
+def get_rotated_basis_from_quat(quaternion: np.ndarray, basis: dict | None = None) -> dict[str, np.ndarray]:
     """
-    Compute the rotated body-frame basis vectors in ECI frame.
-    Args:
-        quaternion: Quaternion [w, x, y, z] representing ECI←body rotation
-        basis: Optional param - basis to start rotation from
+    Compute rotated body-frame basis vectors (X, Y, Z) in inertial frame.
 
-    Returns: Dict with rotated unit vectors for body X, Y, Z in ECI
+    Args:
+        quaternion: Quaternion [w, x, y, z]
+        basis: Optional dictionary with initial XYZ vectors
+
+    Returns:
+        Dictionary with rotated unit vectors in inertial frame
     """
-    # Reorder quaternion to match scipy's format: [q1, q2, q3, q0]
+    # Reorder quaternion to match scipy's format: [x, y, z, w]
     q = np.array([quaternion[1], quaternion[2], quaternion[3], quaternion[0]])
     rotation = Rotation.from_quat(q)
 
@@ -44,7 +59,6 @@ def get_rotated_basis_from_quat(quaternion, basis=None):
             "Y": np.round(rotation.apply(basis["Y"]), 4),
             "Z": np.round(rotation.apply(basis["Z"]), 4),
         }
-
     else:
         rotated_basis = {
             "X": np.round(rotation.apply([1, 0, 0]), 4),
@@ -55,10 +69,16 @@ def get_rotated_basis_from_quat(quaternion, basis=None):
     return rotated_basis
 
 
-def compute_quaternion_derivative(quaternion, angular_velocity):
+def compute_quaternion_derivative(quaternion: np.ndarray, angular_velocity: np.ndarray) -> np.ndarray:
     """
-    Computes dq/dt given quaternion and body-frame angular velocity.
-    Quaternion is in [q0, q1, q2, q3] format.
+    Compute time derivative of quaternion from angular velocity.
+
+    Args:
+        quaternion: Current quaternion [w, x, y, z]
+        angular_velocity: Angular velocity vector in body frame (rad/s)
+
+    Returns:
+        Quaternion derivative dq/dt
     """
     w_x, w_y, w_z = angular_velocity
     Omega = np.array(
@@ -74,6 +94,16 @@ def compute_quaternion_derivative(quaternion, angular_velocity):
 
 
 def quaternion_multiply(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
+    """
+    Multiply two quaternions
+
+    Args:
+        q1: First quaternion [w, x, y, z]
+        q2: Second quaternion [w, x, y, z]
+
+    Returns:
+        Product quaternion q1 * q2
+    """
     w1, x1, y1, z1 = q1
     w2, x2, y2, z2 = q2
     return np.array(
@@ -87,10 +117,28 @@ def quaternion_multiply(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
 
 
 def quaternion_inverse(q: np.ndarray) -> np.ndarray:
+    """
+    Compute the inverse of a quaternion.
+
+    Args:
+        q: Input quaternion [w, x, y, z]
+
+    Returns:
+        Inverse quaternion
+    """
     return np.array([q[0], -q[1], -q[2], -q[3]]) / np.linalg.norm(q) ** 2
 
 
 def quat_to_angle_axis(q: np.ndarray) -> np.ndarray:
+    """
+    Convert quaternion to axis-angle representation.
+
+    Args:
+        q: Input quaternion [w, x, y, z]
+
+    Returns:
+        Array [angle, axis_x, axis_y, axis_z]
+    """
     q /= np.linalg.norm(q)
     # Check for rotations greater than 180 deg - flip quaternion for minimal angle
     if q[0] < 0:
@@ -109,6 +157,15 @@ def quat_to_angle_axis(q: np.ndarray) -> np.ndarray:
 
 
 def angle_axis_to_quat(angle_axis: np.ndarray) -> np.ndarray:
+    """
+    Convert axis-angle representation to quaternion.
+
+    Args:
+        angle_axis: Array [angle (rad), axis_x, axis_y, axis_z]
+
+    Returns:
+        Quaternion [w, x, y, z]
+    """
     axis_norm = np.linalg.norm(angle_axis[1:])
     angle = angle_axis[0]
     if (axis_norm == 0) or (angle == 0):
@@ -118,36 +175,48 @@ def angle_axis_to_quat(angle_axis: np.ndarray) -> np.ndarray:
     return quaternion / np.linalg.norm(quaternion)
 
 
-def compute_minimal_quaternion_rotation(desired_z_vector):
-    # Compute minimal quaternion to rotate body Z [0,0,1] to desired_z
+def compute_minimal_quaternion_rotation(desired_z_vector: np.ndarray) -> np.ndarray:
+    """
+    Compute the minimal rotation quaternion that aligns body Z-axis with a target direction.
+
+    Args:
+        desired_z_vector: Desired direction for body Z-axis (unit vector)
+
+    Returns:
+        Quaternion that rotates [0,0,1] to desired_z_vector
+    """
     body_z_vector = np.array([0, 0, 1])
     dot = np.dot(body_z_vector, desired_z_vector)
-    dot = np.clip(dot, -1.0, 1.0)
+    if abs(dot - 1.0) < 1e-6:
+        return np.array([1.0, 0.0, 0.0, 0.0])  # Already aligned
+    if abs(dot + 1.0) < 1e-6:
+        # 180 degree rotation around arbitrary perpendicular axis
+        perp = np.array([1, 0, 0]) if abs(body_z_vector[0]) < 0.9 else np.array([0, 1, 0])
+        cross = np.cross(body_z_vector, perp)
+        cross /= np.linalg.norm(cross)
+        return np.array([0.0, cross[0], cross[1], cross[2]])
 
-    if dot > 0.99999:
-        return np.array([1.0, 0.0, 0.0, 0.0])
-    if dot < -0.99999:
-        # 180 flip
-        return np.array([0.0, 1.0, 0.0, 0.0])
-
-    cross_product = np.cross(body_z_vector, desired_z_vector)
-    cross_norm = np.linalg.norm(cross_product)
-    if cross_norm < 1e-6:
-        axis = np.array([0.0, 0.0, 0.0])
-    else:
-        axis = cross_product / cross_norm
-    angle = np.arccos(dot)
-    sin_half = np.sin(angle / 2.0)
-    cos_half = np.cos(angle / 2.0)
-    quat = np.array([cos_half, sin_half * axis[0], sin_half * axis[1], sin_half * axis[2]])
-    return quat / np.linalg.norm(quat)
+    cross = np.cross(body_z_vector, desired_z_vector)
+    cross_norm = np.linalg.norm(cross)
+    w = 1.0 + dot
+    quat = np.array([w, cross[0], cross[1], cross[2]])
+    quat /= np.linalg.norm(quat)
+    return quat
 
 
-def compute_orbital_elements(position: np.ndarray, velocity: np.ndarray, gravitational_parameter: float) -> dict:
+def compute_orbital_elements(
+    position: np.ndarray, velocity: np.ndarray, gravitational_parameter: float
+) -> dict[str, float | np.ndarray]:
     """
-    Compute Keplerian elements from position and velocity (inertial frame).
-    Returns dict with 'semi_major_axis', 'eccentricity', 'apoapsis_radius', 'periapsis_radius', 'eccentricity_vector'.
-    Handles hyperbolic and parabolic cases without returning None.
+    Compute Keplerian orbital elements from position and velocity.
+
+    Args:
+        position: Position vector (m)
+        velocity: Velocity vector (m/s)
+        gravitational_parameter: μ = G·M (m³/s²)
+
+    Returns:
+        Dictionary with semi-major axis, eccentricity, apoapsis, periapses, etc.
     """
     position_magnitude = np.linalg.norm(position)
     velocity_squared = np.dot(velocity, velocity)
@@ -199,34 +268,46 @@ def compute_time_to_apoapsis(
     position: np.ndarray, velocity: np.ndarray, orbital_elements: dict, gravitational_parameter: float
 ) -> float:
     """
-    Compute time (s) to next apoapsis from current state.
-    Assumes elliptic orbit (orbital_elements not None).
+    Compute time to next apoapsis for an elliptic orbit.
+
+    Args:
+        position: Current position vector (m)
+        velocity: Current velocity vector (m/s)
+        orbital_elements: Dictionary of orbital elements
+        gravitational_parameter: μ = G·M (m³/s²)
+
+    Returns:
+        Time to apoapsis (seconds)
     """
     position_magnitude = np.linalg.norm(position)
     eccentricity_vector = orbital_elements["eccentricity_vector"]
     eccentricity = orbital_elements["eccentricity"]
     semi_major_axis = orbital_elements["semi_major_axis"]
+
     # True anomaly
     cosine_true_anomaly = np.dot(eccentricity_vector, position) / (eccentricity * position_magnitude)
     cosine_true_anomaly = np.clip(cosine_true_anomaly, -1.0, 1.0)
     true_anomaly_initial = np.arccos(cosine_true_anomaly)
-    radial_velocity = np.dot(velocity, position) / position_magnitude  # Radial velocity
+    radial_velocity = np.dot(velocity, position) / position_magnitude
     if radial_velocity < 0:
         true_anomaly = 2 * np.pi - true_anomaly_initial
     else:
         true_anomaly = true_anomaly_initial
+
     # Eccentric anomaly
     sqrt_term = np.sqrt((1 - eccentricity) / (1 + eccentricity))
     tangent_half_true_anomaly = np.tan(true_anomaly / 2)
     eccentric_anomaly = 2 * np.arctan(sqrt_term * tangent_half_true_anomaly)
     if eccentric_anomaly < 0:
         eccentric_anomaly += 2 * np.pi
+
     # Mean anomaly
     mean_anomaly = eccentric_anomaly - eccentricity * np.sin(eccentric_anomaly)
     if mean_anomaly < np.pi:
         delta_mean_anomaly = np.pi - mean_anomaly
     else:
         delta_mean_anomaly = np.pi - mean_anomaly + 2 * np.pi
+
     # Mean motion
     mean_motion = np.sqrt(gravitational_parameter / semi_major_axis**3)
     time_to_apoapsis = delta_mean_anomaly / mean_motion
