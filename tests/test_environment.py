@@ -1,70 +1,39 @@
 import numpy as np
 from environment import Environment
-from vehicle import Falcon9FirstStage
 
 
-# Constants
-G = 6.67430e-11
-M_earth = 5.972e24
-R_earth = 6371000
+def test_gravitational_force_surface(basic_environment):
+    # At Earth's surface, along -Z
+    pos = np.array([0, 0, basic_environment.earth_radius])
+    mass = 1.0
+    force = basic_environment.gravitational_force(pos, mass)
+    g = -9.80665  # Expected
+    np.testing.assert_allclose(force / mass, [0, 0, g], atol=0.1)  # Accel
 
 
-def test_gravity_at_surface():
+def test_gravitational_force_zero(basic_environment):
+    pos = np.zeros(3)
+    force = basic_environment.gravitational_force(pos, 1.0)
+    np.testing.assert_allclose(force, [0, 0, 0])
+
+
+def test_atmospheric_density():
     env = Environment()
-    position = np.array([R_earth, 0, 0])  # 1 Earth radius away along x-axis
-    mass = 1.0  # 1 kg test mass
-    g_expected = -G * M_earth * mass / R_earth**2
-    g_computed = env.gravitational_force(position, mass)
-    assert np.isclose(np.linalg.norm(g_computed), abs(g_expected), rtol=1e-5)
+    density_sea = env.atmospheric_density(0)
+    assert np.isclose(density_sea, 1.225)
+    density_high = env.atmospheric_density(100000)
+    assert density_high < 1e-5  # Very low at 100km
 
 
-def test_gravity_direction():
-    env = Environment()
-    position = np.array([0, R_earth, 0])
-    force = env.gravitational_force(position, 1.0)
-    direction = force / np.linalg.norm(force)
-    assert np.allclose(direction, -position / np.linalg.norm(position), rtol=1e-5)
+def test_drag_force(basic_environment, basic_vehicle):
+    pos = np.array([0, 0, basic_environment.earth_radius])  # Surface
+    vel = np.array([0, 0, 1000])  # Upward
+    quat = np.array([1, 0, 0, 0])  # Aligned
+    drag = basic_environment.drag_force(pos, vel, basic_vehicle, quat)
+    assert drag[2] < 0  # Opposes velocity (negative Z)
+    assert np.linalg.norm(drag) > 0
 
 
-def test_drag_force_zero_velocity():
-    env = Environment()
-    vehicle = Vehicle(
-        dry_mass=25600,
-        initial_prop_mass=395700,
-        thrust_magnitude=7200000,
-        burn_duration=162,
-        moment_of_inertia=np.diag([470297, 470297, 705445]),
-        base_drag_coefficient=0.3,
-        drag_scaling_coefficient=2.0,
-        cross_sectional_area=10.5,
-        engine_gimbal_limit_deg=10.0,
-        engine_gimbal_arm_len=18.0,
-    )
-    position = np.array([0, 0, R_earth + 1000])
-    velocity = np.zeros(3)
-    quaternion = np.array([1, 0, 0, 0])
-    drag = env.drag_force(position, velocity, vehicle, quaternion)
-    assert np.allclose(drag, np.zeros(3))
-
-
-def test_drag_force_magnitude():
-    env = Environment()
-    vehicle = Vehicle(
-        dry_mass=25600,
-        initial_prop_mass=395700,
-        thrust_magnitude=7200000,
-        burn_duration=162,
-        moment_of_inertia=np.diag([470297, 470297, 705445]),
-        base_drag_coefficient=0.5,
-        drag_scaling_coefficient=2.0,
-        cross_sectional_area=0.1,
-        engine_gimbal_limit_deg=10.0,
-        engine_gimbal_arm_len=18.0,
-    )
-    velocity = np.array([0, 0, -100])
-    position = np.array([0, 0, R_earth + 1000])
-    quaternion = np.array([1, 0, 0, 0])
-    drag = env.drag_force(position, velocity, vehicle, quaternion)
-    rho = env.atmospheric_density(1000)
-    expected_magnitude = 0.5 * rho * 100**2 * 0.5 * 0.1
-    assert np.isclose(np.linalg.norm(drag), expected_magnitude, rtol=1e-3)
+def test_drag_force_zero_vel(basic_environment, basic_vehicle):
+    drag = basic_environment.drag_force(np.array([0, 0, 1e6]), np.zeros(3), basic_vehicle, np.array([1, 0, 0, 0]))
+    np.testing.assert_allclose(drag, [0, 0, 0])

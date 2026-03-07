@@ -43,7 +43,7 @@ def calculate_dynamics(
     # Check throttle and remaining propellant
     if throttle > 0 and propellant_mass > 0:
         thrust_force, thrust_vector_torque = vehicle.thrust_vector(
-            time, quaternion, gimbal_angles, throttle, propellant_mass
+            quaternion, gimbal_angles, throttle, propellant_mass
         )
         mass_flow_rate = vehicle.mdot_max * throttle
 

@@ -60,14 +60,6 @@ class Vehicle(ABC):
         self.rcs_thrusters = []
         self._setup_propulsion_system()
 
-        # TODO: This needs to live somewhere else
-        self.grid_fin_deflections = {
-            "Fin 1": 0.0,
-            "Fin 2": 0.0,
-            "Fin 3": 0.0,
-            "Fin 4": 0.0,
-        }
-
     # TODO: This needs to live somewhere else
     def get_grid_fin_deflections(self, time: float | None, state: np.ndarray | None) -> dict[str, float]:
         """
@@ -80,7 +72,12 @@ class Vehicle(ABC):
         Returns:
             Dictionary of fin deflection angles (radians)
         """
-        return self.grid_fin_deflections
+        return {
+            "Fin 1": 0.0,
+            "Fin 2": 0.0,
+            "Fin 3": 0.0,
+            "Fin 4": 0.0,
+        }
 
     @abstractmethod
     def _setup_propulsion_system(self) -> None:
@@ -105,7 +102,6 @@ class Vehicle(ABC):
 
     def thrust_vector(
         self,
-        time: float,
         quaternion: np.ndarray,
         gimbal_angles_list: list[list[float]],
         throttle: float = 1.0,
@@ -115,7 +111,6 @@ class Vehicle(ABC):
         Compute total thrust force (inertial) and torque (body) from all engines.
 
         Args:
-            time: Current simulation time (s)
             quaternion: Current attitude quaternion [w, x, y, z]
             gimbal_angles_list: List of [pitch, yaw] angles for each engine (rad)
             throttle: Throttle level (0.0 to 1.0)
