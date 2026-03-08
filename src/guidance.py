@@ -5,7 +5,7 @@ import cvxpy as cp
 from abc import ABC, abstractmethod
 
 from state import State
-from utils import compute_minimal_quaternion_rotation, compute_orbital_elements
+from utils import compute_body_z_to_inertial_quat, compute_orbital_elements
 from environment import Environment
 
 
@@ -249,7 +249,7 @@ class ModeBasedGuidance(Guidance):
                 if abs(det) < 1e-6 or np.isnan(det):
                     print(f"PEG Convergence Failed at t={time}. Default Horizontal")
                     self.current_attitude_mode = "horizontal"
-                    return compute_minimal_quaternion_rotation(horizontal_unit)
+                    return compute_body_z_to_inertial_quat(horizontal_unit)
 
                 sol = np.linalg.solve(A_mat, [rhs_dot, rhs_r])
                 A, B = sol
@@ -303,4 +303,4 @@ class ModeBasedGuidance(Guidance):
         else:
             raise ValueError(f"Unknown attitude mode: {mode}")
 
-        return compute_minimal_quaternion_rotation(desired_z_vector)
+        return compute_body_z_to_inertial_quat(desired_z_vector)

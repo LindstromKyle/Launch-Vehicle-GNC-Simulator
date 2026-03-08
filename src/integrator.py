@@ -70,7 +70,6 @@ def integrate_rk4(
 
         # Calculate intermediate slopes, logging k_1 every [log_interval] seconds
         k_1 = calculate_dynamics(
-            time=current_time,
             state=current_state,
             vehicle=vehicle,
             environment=environment,
@@ -78,7 +77,6 @@ def integrate_rk4(
             controls=controls,
         )
         k_2 = calculate_dynamics(
-            time=current_time + h / 2,
             state=current_state + k_1 / 2,
             vehicle=vehicle,
             environment=environment,
@@ -86,7 +84,6 @@ def integrate_rk4(
             controls=controls,
         )
         k_3 = calculate_dynamics(
-            time=current_time + h / 2,
             state=current_state + k_2 / 2,
             vehicle=vehicle,
             environment=environment,
@@ -94,7 +91,6 @@ def integrate_rk4(
             controls=controls,
         )
         k_4 = calculate_dynamics(
-            time=current_time + h,
             state=current_state + k_3,
             vehicle=vehicle,
             environment=environment,
@@ -186,7 +182,6 @@ def integrate_verlet(
 
         # Dynamics
         deriv_current = calculate_dynamics(
-            time=current_time,
             state=current_state,
             vehicle=vehicle,
             environment=environment,
@@ -224,7 +219,6 @@ def integrate_verlet(
 
         # Recompute forces/torques
         deriv_new = calculate_dynamics(
-            time=current_time + h,
             state=current_state,
             vehicle=vehicle,
             environment=environment,

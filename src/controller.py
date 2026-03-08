@@ -5,7 +5,7 @@ from scipy.optimize import nnls
 from abc import ABC, abstractmethod
 
 from guidance import Guidance
-from utils import quaternion_multiply, quaternion_inverse, quat_to_angle_axis, rotate_vector_by_quaternion
+from utils import quaternion_multiply, quaternion_inverse, quat_to_angle_axis, rotate_body_to_inertial_by_quat
 from vehicle import Vehicle
 
 
@@ -24,7 +24,7 @@ class Controller(ABC):
             time: Current simulation time (seconds)
             state_vector: Full state vector [pos, vel, quat, ang_vel, prop_mass]
             mission_planner_setpoints: Dictionary of current mission setpoints
-            log_flag: Whether to log detailed information this step
+            log_flag: Whether to log information this step
 
         Returns:
             Dictionary containing control commands (throttle, gimbal angles, etc.)
@@ -71,9 +71,9 @@ class PIDAttitudeController(Controller):
 
         Args:
             time: Current simulation time (seconds)
-            state_vector: Full 14-element state vector
+            state_vector: Full state vector
             mission_planner_setpoints: Current mission phase setpoints
-            log_flag: True if detailed logging should occur this step
+            log_flag: Whether logging should occur this step
 
         Returns:
             Dictionary with keys: desired_torque, engine_gimbal_angles, throttle,
@@ -91,15 +91,7 @@ class PIDAttitudeController(Controller):
             desired_quaternion = self.guidance.get_desired_quaternion(time, state_vector, mission_planner_setpoints)
             desired_quaternion /= np.linalg.norm(desired_quaternion)
 
-            # smoothing desired quart
-            if not hasattr(self, "last_desired_quat"):
-                self.last_desired_quat = desired_quaternion.copy()
-            alpha_des = 0.96
-            desired_quaternion = alpha_des * desired_quaternion + (1 - alpha_des) * self.last_desired_quat
-            self.last_desired_quat = desired_quaternion.copy()
-            desired_quaternion /= np.linalg.norm(desired_quaternion)
-
-            # Compute quaternion error (expressed in Body basis vectors)
+            # Compute quaternion error
             error_quaternion = quaternion_multiply(desired_quaternion, quaternion_inverse(current_quaternion))
             error_quaternion /= np.linalg.norm(error_quaternion)
 
@@ -110,14 +102,12 @@ class PIDAttitudeController(Controller):
 
             # Convert to angle-axis for PID
             angle_axis = quat_to_angle_axis(error_quaternion)
-            current_error = angle_axis[0] * angle_axis[1:]  # angle (rad) * Axis
+            current_error = angle_axis[0] * angle_axis[1:]
 
             # Basic gain scheduling
             current_mass = self.vehicle.dry_mass + current_propellant_mass
-            # TODO: think about this
-            # mass_ratio = current_mass / self.vehicle.dry_mass
-            # kp_scheduled = self.kp / mass_ratio  # Lower early, higher late
-            kp_scheduled = self.kp.copy()
+            mass_ratio = current_mass / self.vehicle.dry_mass
+            kp_scheduled = self.kp.copy() / mass_ratio
             kd_scheduled = self.kd.copy()
 
             # Deadband RCS if coasting to hold prograde without continuously firing
@@ -134,9 +124,8 @@ class PIDAttitudeController(Controller):
             d_term = np.zeros(3)
             if self.last_update_time:
                 dt = time - self.last_update_time
-                if dt > 0:
-                    self.integral_error += current_error * dt
-                    d_term = kd_scheduled * (current_error - self.previous_error) / dt
+                self.integral_error += current_error * dt
+                d_term = kd_scheduled * (current_error - self.previous_error) / dt
 
             # Low pass filter on d term
             # TODO: put alpha in __init__?
@@ -157,8 +146,7 @@ class PIDAttitudeController(Controller):
             control_torque = unsaturated_torque.copy()
 
             # Map torque to actuators
-            thrust_magnitude = self.vehicle.get_thrust_magnitude(time)
-            effective_thrust_magnitude = thrust_magnitude * throttle
+            effective_thrust_magnitude = self.vehicle.get_thrust_magnitude(throttle)
             gimbal_arm = self.vehicle.get_gimbal_arm(current_propellant_mass)
             if effective_thrust_magnitude > 1e-3:
                 max_torque = effective_thrust_magnitude * np.sin(self.vehicle.engine_gimbal_limit_rad) * gimbal_arm
@@ -190,8 +178,8 @@ class PIDAttitudeController(Controller):
             self.guidance.current_attitude_mode = "passive"
 
         if log_flag:
-            current_z_unit_vector = rotate_vector_by_quaternion(np.array([0, 0, 1]), current_quaternion)
-            desired_z_unit_vector = rotate_vector_by_quaternion(np.array([0, 0, 1]), desired_quaternion)
+            current_z_unit_vector = rotate_body_to_inertial_by_quat(np.array([0, 0, 1]), current_quaternion)
+            desired_z_unit_vector = rotate_body_to_inertial_by_quat(np.array([0, 0, 1]), desired_quaternion)
             attitude_error = desired_z_unit_vector - current_z_unit_vector
             position = state_vector[:3]
             radial_unit_vector = position / np.linalg.norm(position)

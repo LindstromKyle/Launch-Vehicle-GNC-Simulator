@@ -7,7 +7,7 @@ from mission import TimeBasedPhase, KickPhase, MissionPlanner, ProgrammedPitchPh
 from plotting import plot_3D_integration_segments
 from simulator import Simulator
 from state import State
-from utils import compute_minimal_quaternion_rotation, rotate_vector_by_quaternion
+from utils import compute_body_z_to_inertial_quat, rotate_body_to_inertial_by_quat
 from vehicle import Falcon9FirstStage
 
 """Simulate short ascent of rocket carrying first and second stage""" ""
@@ -66,8 +66,8 @@ omega_cross_r = np.cross(environment.earth_angular_velocity_vector, initial_posi
 
 # Initial quaternion: align body Z with local vertical (radial unit vector)
 radial_unit_vector = initial_position / np.linalg.norm(initial_position)
-initial_quaternion = compute_minimal_quaternion_rotation(radial_unit_vector)
-pitch_direction = rotate_vector_by_quaternion(np.array([0, 1, 0]), initial_quaternion)
+initial_quaternion = compute_body_z_to_inertial_quat(radial_unit_vector)
+pitch_direction = rotate_body_to_inertial_by_quat(np.array([0, 1, 0]), initial_quaternion)
 
 # State
 initial_state = State(

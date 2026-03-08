@@ -1,6 +1,6 @@
 import numpy as np
 from guidance import ModeBasedGuidance
-from utils import compute_minimal_quaternion_rotation
+from utils import compute_body_z_to_inertial_quat
 
 
 def test_get_desired_quaternion_prograde(basic_environment):
@@ -11,7 +11,7 @@ def test_get_desired_quaternion_prograde(basic_environment):
     state[3:6] = [0, 1000, 0]  # Vel along Y
     setpoints = {"attitude_mode": "prograde"}
     quat = guidance.get_desired_quaternion(0, state, setpoints)
-    expected = compute_minimal_quaternion_rotation(np.array([0, 1, 0]))  # Along vel
+    expected = compute_body_z_to_inertial_quat(np.array([0, 1, 0]))  # Along vel
     np.testing.assert_allclose(quat, expected, atol=1e-4)
 
 
@@ -22,5 +22,5 @@ def test_get_desired_quaternion_radial(basic_environment):
     state[0:3] = [1e6, 0, 0]  # Along X
     setpoints = {"attitude_mode": "radial"}
     quat = guidance.get_desired_quaternion(0, state, setpoints)
-    expected = compute_minimal_quaternion_rotation(np.array([1, 0, 0]))
+    expected = compute_body_z_to_inertial_quat(np.array([1, 0, 0]))
     np.testing.assert_allclose(quat, expected, atol=1e-4)

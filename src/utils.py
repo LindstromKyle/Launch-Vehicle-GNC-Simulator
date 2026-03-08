@@ -6,22 +6,7 @@ from scipy.spatial.transform import Rotation
 warnings.filterwarnings("error", category=RuntimeWarning)
 
 
-def compute_acceleration(t_vals: np.ndarray, velocity_vals: np.ndarray) -> np.ndarray:
-    """
-    Compute acceleration from velocity.
-
-    Args:
-        t_vals: Array of time points (s)
-        velocity_vals: Array of velocity values (m/s)
-
-    Returns:
-        Array of acceleration values (m/s²)
-    """
-    acceleration_vals = np.gradient(velocity_vals, t_vals)
-    return acceleration_vals
-
-
-def rotate_vector_by_quaternion(vector: np.ndarray, quaternion: np.ndarray) -> np.ndarray:
+def rotate_body_to_inertial_by_quat(vector: np.ndarray, quaternion: np.ndarray) -> np.ndarray:
     """
     Rotate a vector from body frame to inertial frame using a quaternion.
 
@@ -36,37 +21,6 @@ def rotate_vector_by_quaternion(vector: np.ndarray, quaternion: np.ndarray) -> n
     q = np.array([quaternion[1], quaternion[2], quaternion[3], quaternion[0]])
     rotation = Rotation.from_quat(q)
     return np.round(rotation.apply(vector), 4)
-
-
-def get_rotated_basis_from_quat(quaternion: np.ndarray, basis: dict | None = None) -> dict[str, np.ndarray]:
-    """
-    Compute rotated body-frame basis vectors (X, Y, Z) in inertial frame.
-
-    Args:
-        quaternion: Quaternion [w, x, y, z]
-        basis: Optional dictionary with initial XYZ vectors
-
-    Returns:
-        Dictionary with rotated unit vectors in inertial frame
-    """
-    # Reorder quaternion to match scipy's format: [x, y, z, w]
-    q = np.array([quaternion[1], quaternion[2], quaternion[3], quaternion[0]])
-    rotation = Rotation.from_quat(q)
-
-    if basis:
-        rotated_basis = {
-            "X": np.round(rotation.apply(basis["X"]), 4),
-            "Y": np.round(rotation.apply(basis["Y"]), 4),
-            "Z": np.round(rotation.apply(basis["Z"]), 4),
-        }
-    else:
-        rotated_basis = {
-            "X": np.round(rotation.apply([1, 0, 0]), 4),
-            "Y": np.round(rotation.apply([0, 1, 0]), 4),
-            "Z": np.round(rotation.apply([0, 0, 1]), 4),
-        }
-
-    return rotated_basis
 
 
 def compute_quaternion_derivative(quaternion: np.ndarray, angular_velocity: np.ndarray) -> np.ndarray:
@@ -175,7 +129,7 @@ def angle_axis_to_quat(angle_axis: np.ndarray) -> np.ndarray:
     return quaternion / np.linalg.norm(quaternion)
 
 
-def compute_minimal_quaternion_rotation(desired_z_vector: np.ndarray) -> np.ndarray:
+def compute_body_z_to_inertial_quat(desired_z_vector: np.ndarray) -> np.ndarray:
     """
     Compute the minimal rotation quaternion that aligns body Z-axis with a target direction.
 
@@ -213,7 +167,7 @@ def compute_orbital_elements(
     Args:
         position: Position vector (m)
         velocity: Velocity vector (m/s)
-        gravitational_parameter: μ = G·M (m³/s²)
+        gravitational_parameter: μ = GM (m³/s²)
 
     Returns:
         Dictionary with semi-major axis, eccentricity, apoapsis, periapses, etc.
@@ -230,14 +184,14 @@ def compute_orbital_elements(
     ) - position / position_magnitude
     eccentricity = np.linalg.norm(eccentricity_vector)
 
-    ENERGY_TOLERANCE = 1e-10
+    energy_tolerance = 1e-10
 
-    if specific_orbital_energy < -ENERGY_TOLERANCE:
+    if specific_orbital_energy < -energy_tolerance:
         # Elliptical orbit
         semi_major_axis = -gravitational_parameter / (2 * specific_orbital_energy)
         apoapsis_radius = semi_major_axis * (1 + eccentricity)
         periapsis_radius = semi_major_axis * (1 - eccentricity)
-    elif specific_orbital_energy > ENERGY_TOLERANCE:
+    elif specific_orbital_energy > energy_tolerance:
         # Hyperbolic orbit
         semi_major_axis = -gravitational_parameter / (2 * specific_orbital_energy)
         apoapsis_radius = float("inf")
@@ -312,3 +266,18 @@ def compute_time_to_apoapsis(
     mean_motion = np.sqrt(gravitational_parameter / semi_major_axis**3)
     time_to_apoapsis = delta_mean_anomaly / mean_motion
     return time_to_apoapsis
+
+
+def compute_acceleration(t_vals: np.ndarray, velocity_vals: np.ndarray) -> np.ndarray:
+    """
+    Compute acceleration from velocity.
+
+    Args:
+        t_vals: Array of time points (s)
+        velocity_vals: Array of velocity values (m/s)
+
+    Returns:
+        Array of acceleration values (m/s²)
+    """
+    acceleration_vals = np.gradient(velocity_vals, t_vals)
+    return acceleration_vals

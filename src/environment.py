@@ -1,6 +1,6 @@
 import numpy as np
 
-from utils import rotate_vector_by_quaternion
+from utils import rotate_body_to_inertial_by_quat
 from vehicle import Vehicle
 
 
@@ -45,7 +45,7 @@ class Environment:
         dz = factor * (5 * z**2 / orbital_radius**2 - 3) * z
         j2_perturbation = vehicle_mass * np.array([dx, dy, dz])  # Acceleration * mass = force
 
-        return newtonian_force + j2_perturbation
+        return newtonian_force  # + j2_perturbation
 
     def atmospheric_density(self, altitude: float) -> float:
         """
@@ -59,7 +59,7 @@ class Environment:
         """
         sea_level_density = 1.225
         scale_height = 8500
-        return sea_level_density * np.exp(-1 * altitude / scale_height)
+        return sea_level_density * np.exp(-altitude / scale_height)
 
     def drag_force(
         self, position: np.ndarray, velocity: np.ndarray, vehicle: Vehicle, quaternion: np.ndarray
@@ -70,7 +70,7 @@ class Environment:
         Args:
             position: Position vector in inertial frame (m)
             velocity: Velocity vector in inertial frame (m/s)
-            vehicle: Vehicle instance (provides drag coefficients and area)
+            vehicle: Vehicle object
             quaternion: Current attitude quaternion [w, x, y, z]
 
         Returns:
@@ -86,7 +86,7 @@ class Environment:
 
         # Compute atmospheric velocity due to Earth's rotation
         omega_cross_r = np.cross(self.earth_angular_velocity_vector, position)
-        # Relative velocity (for accurate airspeed)
+        # Relative velocity of rocket compared to atmosphere
         relative_velocity = velocity - omega_cross_r
         relative_velocity_magnitude = np.linalg.norm(relative_velocity)
 
@@ -99,10 +99,11 @@ class Environment:
 
         # Transform body frame Z axis to inertial frame
         body_frame_z_axis = np.array([0, 0, 1])
-        inertial_frame_z_axis = rotate_vector_by_quaternion(body_frame_z_axis, quaternion)
+        inertial_frame_z_axis = rotate_body_to_inertial_by_quat(body_frame_z_axis, quaternion)
 
         # Compute angle of attack (radians)
-        cos_alpha = np.dot(relative_velocity, inertial_frame_z_axis) / relative_velocity_magnitude
+        relative_vel_unit = relative_velocity / relative_velocity_magnitude
+        cos_alpha = np.dot(relative_vel_unit, inertial_frame_z_axis)
         # Clamp for numerical safety
         cos_alpha = np.clip(cos_alpha, -1.0, 1.0)
         angle_of_attack = np.arccos(cos_alpha)

@@ -4,22 +4,21 @@ import warnings
 
 from environment import Environment
 from vehicle import Vehicle
-from utils import compute_quaternion_derivative, rotate_vector_by_quaternion, compute_orbital_elements
+from utils import compute_quaternion_derivative, rotate_body_to_inertial_by_quat, compute_orbital_elements
 
 warnings.filterwarnings("error", category=RuntimeWarning)
 
 
 def calculate_dynamics(
-    time: float, state: np.ndarray, vehicle: Vehicle, environment: Environment, log_flag: bool, controls: dict
+    state: np.ndarray, vehicle: Vehicle, environment: Environment, log_flag: bool, controls: dict
 ) -> np.ndarray:
     """
     Calculates linear and angular state derivatives, as well as mass flow rate.
 
     Args:
-        time: Current simulation time (seconds)
         state: Full state vector [position, velocity, quaternion, angular_velocity, propellant_mass]
-        vehicle: Vehicle object containing mass, thrust, inertia, etc.
-        environment: Environment object with gravity, drag, etc.
+        vehicle: Vehicle object
+        environment: Environment object
         log_flag: Whether to write detailed logging this timestep
         controls: Dictionary of control inputs (throttle, gimbal angles, RCS levels, etc.)
 
@@ -53,7 +52,7 @@ def calculate_dynamics(
         mass_flow_rate = 0.0
 
     # Compute forces
-    rcs_force, rcs_torque = vehicle.rcs_vector(quaternion, controls.get("rcs_levels", []))
+    rcs_force, rcs_torque = vehicle.rcs_vector(quaternion, controls.get("rcs_levels"))
     gravitational_force = environment.gravitational_force(position, vehicle_mass)
     drag_force = environment.drag_force(position, velocity, vehicle, quaternion)
     net_force = thrust_force + gravitational_force + drag_force + rcs_force
@@ -67,10 +66,11 @@ def calculate_dynamics(
     # Angular dynamics
     moment_of_inertia = vehicle.moment_of_inertia
     aerodynamic_torque = environment.aerodynamic_torque(position, velocity, quaternion, angular_velocity, vehicle)
-    total_torque = thrust_vector_torque + aerodynamic_torque + rcs_torque
+    # Gyroscopic reaction
     angular_momentum = moment_of_inertia @ angular_velocity
     gyroscopic_reaction_torque = np.cross(angular_velocity, angular_momentum)
-    angular_acceleration = np.linalg.inv(moment_of_inertia) @ (total_torque - gyroscopic_reaction_torque)
+    total_torque = thrust_vector_torque + aerodynamic_torque + rcs_torque - gyroscopic_reaction_torque
+    angular_acceleration = np.linalg.inv(moment_of_inertia) @ total_torque
 
     # Log state evolution
     if log_flag:

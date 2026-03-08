@@ -156,7 +156,6 @@ class CircBurnPhase(Phase):
 
     def __init__(
         self,
-        peri_tolerance_factor: float = 0.98,
         attitude_mode: str = "prograde",
         throttle: float = 1.0,
         name: str = "Unnamed",
@@ -164,7 +163,6 @@ class CircBurnPhase(Phase):
         throttle_kp: float = 20.0,
         target_eccentricity: float = 0.002,
     ):
-        self.peri_tolerance_factor = peri_tolerance_factor
         self.attitude_mode = attitude_mode
         self.throttle = throttle
         self.name = name
@@ -176,12 +174,9 @@ class CircBurnPhase(Phase):
         if elements is None:
             return False
 
-        # TODO: better way of doing this - currently checking for 1000km apoapsis meaning we missed the cutoff
+        # TODO: better way of doing this - currently checking for 1000km apoapsis (missed the cutoff)
         if elements["apoapsis_radius"] > 6371000 + 1000000:
             return True
-
-        # Existing check
-        peri_ok = elements["periapsis_radius"] >= self.peri_tolerance_factor * elements["apoapsis_radius"]
 
         # Eccentricity checks
         ecc_ok = elements["eccentricity"] < self.target_eccentricity
@@ -191,14 +186,14 @@ class CircBurnPhase(Phase):
     def get_setpoints(self, time: float, state_vector: np.ndarray, elements: dict) -> dict:
         if elements["apoapsis_radius"] == float("inf") or elements["periapsis_radius"] <= 0:
             # Safety: Fallback for hyperbolic or invalid orbits
-            dynamic_throttle = 1.0
+            throttle = 0.0
         else:
             ratio = elements["periapsis_radius"] / elements["apoapsis_radius"]
             error = max(0.0, 1.0 - ratio)  # Positive error
-            dynamic_throttle = max(self.min_throttle, min(1.0, self.throttle_kp * error))
+            throttle = max(self.min_throttle, min(1.0, self.throttle_kp * error))
 
         return {
-            "throttle": dynamic_throttle,
+            "throttle": throttle,
             "attitude_mode": self.attitude_mode,
             "target_r": elements.get("apoapsis_radius", float("inf")),
         }
@@ -260,7 +255,7 @@ class PEGPhase(Phase):
         min_throttle: Minimum throttle during terminal guidance
         throttle_kp: Proportional gain for throttle adjustment near target
         throttle_threshold_factor: Scaling factor for when to reduce throttle
-        throttle: Maximum/nominal throttle level
+        throttle: Maximum throttle level
         name: Name of the phase
     """
 
@@ -354,8 +349,6 @@ class MissionPlanner:
         self.environment = environment
         self.vehicle = vehicle
         self.phase_transitions = [(start_time, phases[0].name)]
-        self.phase_start_times = [start_time] * len(phases)
-        self.phase_start_times[0] = start_time
         # Inject mu to phases if needed
         for phase in self.phases:
             # TODO: find better way than his hack
@@ -384,8 +377,6 @@ class MissionPlanner:
             self.current_phase_idx += 1
             if self.current_phase_idx < len(self.phases):
                 self.phase_transitions.append((time, self.phases[self.current_phase_idx].name))
-                # Update start time for the new phase
-                self.phase_start_times[self.current_phase_idx] = time
             else:
                 logging.info(f"Integration segment complete at t={time:.2f}")
                 return {"throttle": 0.0, "attitude_mode": "prograde"}
@@ -394,18 +385,16 @@ class MissionPlanner:
         # Get base setpoints from phase
         setpoints = self.current_phase.get_setpoints(time, state_vector, elements)
 
-        # Dynamically add start_time and duration
-        if setpoints.get("attitude_mode") in ["programmed_pitch", "pitch_to_apoapsis"]:
-            current_phase_start_time = self.phase_start_times[self.current_phase_idx]
+        # Add time info for pitch program
+        if setpoints.get("attitude_mode") == "programmed_pitch":
+            current_phase_start_time = self.phase_transitions[self.current_phase_idx][0]
             setpoints["start_time"] = current_phase_start_time
-            if setpoints.get("attitude_mode") == "programmed_pitch":
-                duration = self.current_phase.end_time - current_phase_start_time
-                setpoints["duration"] = duration
+            duration = self.current_phase.end_time - current_phase_start_time
+            setpoints["duration"] = duration
 
+        # Add additional phase setpoints
         setpoints["mu"] = self.mu
         setpoints["g0"] = 9.80665  # Standard gravity
-        # Pass vehicle params
-        setpoints["thrust"] = self.vehicle.base_thrust_magnitude
         setpoints["thrust"] = self.vehicle.base_thrust_magnitude
         setpoints["isp"] = self.vehicle.average_isp
         setpoints["dry_mass"] = self.vehicle.dry_mass

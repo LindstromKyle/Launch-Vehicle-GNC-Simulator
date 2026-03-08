@@ -1,6 +1,6 @@
 import numpy as np
 from utils import (
-    rotate_vector_by_quaternion,
+    rotate_body_to_inertial_by_quat,
     quaternion_multiply,
     quaternion_inverse,
     quat_to_angle_axis,
@@ -13,12 +13,12 @@ def test_rotate_vector_by_quaternion():
     # Identity quaternion: no rotation
     vector = np.array([1, 0, 0])
     quat = np.array([1, 0, 0, 0])
-    rotated = rotate_vector_by_quaternion(vector, quat)
+    rotated = rotate_body_to_inertial_by_quat(vector, quat)
     np.testing.assert_allclose(rotated, vector, atol=1e-4)
 
     # 90 deg rotation around Z
     quat = np.array([np.cos(np.pi / 4), 0, 0, np.sin(np.pi / 4)])
-    rotated = rotate_vector_by_quaternion(vector, quat)
+    rotated = rotate_body_to_inertial_by_quat(vector, quat)
     np.testing.assert_allclose(rotated, [0, 1, 0], atol=1e-4)
 
 

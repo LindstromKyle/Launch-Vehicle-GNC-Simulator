@@ -14,7 +14,7 @@ from mission import (
 from plotting import plot_3D_integration_segments
 from simulator import Simulator
 from state import State
-from utils import compute_minimal_quaternion_rotation, rotate_vector_by_quaternion
+from utils import compute_body_z_to_inertial_quat, rotate_body_to_inertial_by_quat
 from vehicle import Falcon9FirstStage, Falcon9SecondStage
 
 # Stage 1
@@ -82,15 +82,16 @@ omega_cross_r = np.cross(environment.earth_angular_velocity_vector, initial_posi
 
 # Initial quaternion: align body Z with local vertical (radial unit vector)
 radial_unit_vector = initial_position / np.linalg.norm(initial_position)
-initial_quaternion = compute_minimal_quaternion_rotation(radial_unit_vector)
-kick_direction = rotate_vector_by_quaternion(np.array([0, 1, 0]), initial_quaternion)
+initial_quaternion = compute_body_z_to_inertial_quat(radial_unit_vector)
+# Initial kick east during pitch program
+kick_direction = rotate_body_to_inertial_by_quat(np.array([0, 1, 0]), initial_quaternion)
 
 # State
 initial_state = State(
     position=initial_position,
     velocity=omega_cross_r,
     quaternion=initial_quaternion,
-    angular_velocity=[0, 0, 0],
+    angular_velocity=np.array([0, 0, 0]),
     propellant_mass=stage1_ascent_prop,
 )
 
@@ -189,7 +190,7 @@ target_periapsis = target_peri_alt + environment.earth_radius
 simulation_end_time = separation_time + 5500
 burnout_quaternion = burnout_state_vector[6:10]
 burnout_position = burnout_state_vector[:3]
-burnout_z_unit_vector = rotate_vector_by_quaternion(np.array([0, 0, 1]), burnout_quaternion)
+burnout_z_unit_vector = rotate_body_to_inertial_by_quat(np.array([0, 0, 1]), burnout_quaternion)
 burnout_radial_unit_vector = burnout_position / np.linalg.norm(burnout_position)
 burnout_dot = np.dot(burnout_z_unit_vector, burnout_radial_unit_vector)
 burnout_pitch = np.rad2deg(np.pi / 2 - np.arccos(np.clip(burnout_dot, -1.0, 1.0)))
@@ -213,10 +214,9 @@ stage2_phases = [
         throttle=0.0,
         name="Coast",
         buffer=5.0,
-        use_dynamic_threshold=True,
+        use_dynamic_threshold=False,
     ),
     CircBurnPhase(
-        peri_tolerance_factor=0.98,
         attitude_mode="prograde",
         throttle=1.0,
         name="Circularization",

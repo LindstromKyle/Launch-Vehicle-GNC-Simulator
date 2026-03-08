@@ -2,7 +2,7 @@ import numpy as np
 
 from abc import abstractmethod, ABC
 
-from utils import rotate_vector_by_quaternion
+from utils import rotate_body_to_inertial_by_quat
 
 
 class Vehicle(ABC):
@@ -19,9 +19,9 @@ class Vehicle(ABC):
         drag_scaling_coefficient: Coefficient for angle-of-attack drag increase
         cross_sectional_area: Reference area for drag calculation (m²)
         engine_gimbal_limit_deg: Maximum engine gimbal angle (degrees)
-        engine_gimbal_arm_len: Distance from CoM to engines (m)
+        engine_gimbal_arm_len: Distance from fully loaded CoM to engines (m)
         dry_com_z: Z-coordinate of center of mass with empty tanks (m)
-        prop_com_z: Z-coordinate of center of mass of propellant (m)
+        prop_com_z: Z-coordinate of center of mass with propellant (m)
     """
 
     def __init__(
@@ -55,9 +55,12 @@ class Vehicle(ABC):
         self.dry_com_z = dry_com_z
         self.prop_com_z = prop_com_z
 
-        # stage-specific engine config
+        # Stage-specific engine config
+        self.num_engines = None
+        self.thrust_per_engine = None
         self.engines = []
         self.rcs_thrusters = []
+        # Initialize real values
         self._setup_propulsion_system()
 
     # TODO: This needs to live somewhere else
@@ -94,9 +97,9 @@ class Vehicle(ABC):
         Returns:
             Z-coordinate of engines relative to current CoM (m)
         """
-        total_mass = self.dry_mass + propellant_mass
-        if total_mass <= 0:
+        if propellant_mass <= 0:
             return self.dry_com_z
+        total_mass = self.dry_mass + propellant_mass
         com_z = (self.dry_mass * self.dry_com_z + propellant_mass * self.prop_com_z) / total_mass
         return com_z
 
@@ -119,8 +122,8 @@ class Vehicle(ABC):
         Returns:
             Tuple of (total thrust force in inertial frame, total torque in body frame)
         """
-        if throttle <= 0 or len(gimbal_angles_list) != self.num_engines:
-            return np.zeros(3), np.zeros(3)
+        if len(gimbal_angles_list) != self.num_engines:
+            raise Exception(f"Expected {self.num_engines} gimbal angles but received {len(gimbal_angles_list)}")
 
         # Get dynamic gimbal arm based on propellant mass
         gimbal_arm = self.get_gimbal_arm(propellant_mass)
@@ -128,6 +131,7 @@ class Vehicle(ABC):
         thrust_force = np.zeros(3)
         thrust_vector_torque = np.zeros(3)
         for i in range(self.num_engines):
+            # Clamp engine angles
             gimbal_pitch, gimbal_yaw = np.clip(
                 gimbal_angles_list[i],
                 -self.engine_gimbal_limit_rad,
@@ -138,24 +142,25 @@ class Vehicle(ABC):
                 [np.sin(gimbal_yaw), -np.sin(gimbal_pitch), np.cos(gimbal_pitch) * np.cos(gimbal_yaw)]
             )
             body_thrust_direction /= np.linalg.norm(body_thrust_direction)
+            # Effective thrust from throttle
             engine_thrust = self.thrust_per_engine * throttle
             body_force = engine_thrust * body_thrust_direction
-            inertial_force = rotate_vector_by_quaternion(body_force, quaternion)
+            # Rotate to inertial and add to total thrust force
+            inertial_force = rotate_body_to_inertial_by_quat(body_force, quaternion)
             thrust_force += inertial_force
-            # Torque: use dynamic gimbal arm for pitch/yaw, engine position for roll
+            # Torque: r cross F. Update z position with dynamic CoM
             engine_pos = self.engines[i]["position"].copy()
-            engine_pos[2] = -gimbal_arm  # Update Z-position with dynamic center of mass
+            engine_pos[2] = -gimbal_arm
             body_torque = np.cross(engine_pos, body_force)
             thrust_vector_torque += body_torque
 
         return thrust_force, thrust_vector_torque
 
-    def get_thrust_magnitude(self, time: float, throttle: float = 1.0) -> float:
+    def get_thrust_magnitude(self, throttle: float = 1.0) -> float:
         """
         Compute total thrust magnitude at given throttle level.
 
         Args:
-            time: Current simulation time (unused here)
             throttle: Throttle level (0.0 to 1.0)
 
         Returns:
@@ -184,7 +189,8 @@ class Vehicle(ABC):
                 continue
             rcs = self.rcs_thrusters[i]
             body_force = level * rcs["max_thrust"] * rcs["direction"]
-            inertial_force = rotate_vector_by_quaternion(body_force, quaternion)
+            inertial_force = rotate_body_to_inertial_by_quat(body_force, quaternion)
+            # Torque: r cross F
             torque = np.cross(rcs["position"], body_force)
             thrust_force += inertial_force
             thrust_torque += torque

@@ -467,7 +467,7 @@ if __name__ == "__main__":
 
     # plot_exhaust_flow_directions(15, array, exaggerate_factor=30000)
 
-    # standard_plot_vs_time(["desired_pitch", "current_pitch"], array, "Pitch Angle (deg)", "Pitch Angle vs Time")
+    standard_plot_vs_time(["desired_pitch", "current_pitch"], array, "Pitch Angle (deg)", "Pitch Angle vs Time")
 
     # standard_plot_vs_time(["current_altitude", "orbital_vel"], array)
 
