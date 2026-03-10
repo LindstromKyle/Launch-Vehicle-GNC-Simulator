@@ -43,7 +43,8 @@ class Environment:
         dx = factor * (5 * z**2 / orbital_radius**2 - 1) * x
         dy = factor * (5 * z**2 / orbital_radius**2 - 1) * y
         dz = factor * (5 * z**2 / orbital_radius**2 - 3) * z
-        j2_perturbation = vehicle_mass * np.array([dx, dy, dz])  # Acceleration * mass = force
+        # F = ma
+        j2_perturbation = vehicle_mass * np.array([dx, dy, dz])
 
         return newtonian_force  # + j2_perturbation
 

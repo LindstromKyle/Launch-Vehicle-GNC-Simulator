@@ -38,9 +38,9 @@ class PIDAttitudeController(Controller):
     to generate desired body torque, then allocates it to engine gimbals and RCS thrusters.
 
     Args:
-        kp: Proportional gain vector [x, y, z] (rad/s)
-        ki: Integral gain vector [x, y, z] (rad/s²)
-        kd: Derivative gain vector [x, y, z] (rad/s)
+        kp: Proportional gain vector [x, y, z] (N·m/rad)
+        ki: Integral gain vector [x, y, z] (N·m/rad·s)
+        kd: Derivative gain vector [x, y, z] (N·m/(rad/s))
         guidance: Guidance instance used to compute desired quaternion
         vehicle: Vehicle instance providing engine and RCS configuration
     """
@@ -95,6 +95,7 @@ class PIDAttitudeController(Controller):
             error_quaternion = quaternion_multiply(desired_quaternion, quaternion_inverse(current_quaternion))
             error_quaternion /= np.linalg.norm(error_quaternion)
 
+            # Enforce the shortest rotation
             if np.dot(error_quaternion, self.prev_error_quat) < 0:
                 error_quaternion = -error_quaternion
             previous_angle_axis = quat_to_angle_axis(self.prev_error_quat)
@@ -106,9 +107,9 @@ class PIDAttitudeController(Controller):
 
             # Basic gain scheduling
             current_mass = self.vehicle.dry_mass + current_propellant_mass
-            mass_ratio = current_mass / self.vehicle.dry_mass
-            kp_scheduled = self.kp.copy() / mass_ratio
-            kd_scheduled = self.kd.copy()
+            mass_ratio = current_mass / (self.vehicle.dry_mass + self.vehicle.initial_propellant_mass)
+            kp_scheduled = self.kp.copy() * mass_ratio
+            kd_scheduled = self.kd.copy() * mass_ratio
 
             # Deadband RCS if coasting to hold prograde without continuously firing
             if throttle <= 0.01:
@@ -121,51 +122,44 @@ class PIDAttitudeController(Controller):
                     kd_scheduled = 0
 
             # Compute PID terms
+            p_term = kp_scheduled * current_error
             d_term = np.zeros(3)
             if self.last_update_time:
                 dt = time - self.last_update_time
                 self.integral_error += current_error * dt
                 d_term = kd_scheduled * (current_error - self.previous_error) / dt
+            i_term = self.ki * self.integral_error
 
             # Low pass filter on d term
-            # TODO: put alpha in __init__?
             alpha = 0.3
             d_term = alpha * d_term + (1 - alpha) * self.previous_d_term
             self.previous_d_term = d_term
 
-            i_term = self.ki * self.integral_error
-            p_term = kp_scheduled * current_error
-
+            # Update stored variables
             self.last_update_time = time
             self.previous_error = current_error
 
             # Compute unsaturated torque
             unsaturated_torque = p_term + i_term + d_term
 
-            # Clip torque for saturation (anti-windup prep)
-            control_torque = unsaturated_torque.copy()
-
             # Map torque to actuators
             effective_thrust_magnitude = self.vehicle.get_thrust_magnitude(throttle)
             gimbal_arm = self.vehicle.get_gimbal_arm(current_propellant_mass)
-            if effective_thrust_magnitude > 1e-3:
-                max_torque = effective_thrust_magnitude * np.sin(self.vehicle.engine_gimbal_limit_rad) * gimbal_arm
-                # Clamp control torque to max for pitch and yaw
-                control_torque[0] = np.clip(control_torque[0], -max_torque, max_torque)
-                control_torque[1] = np.clip(control_torque[1], -max_torque, max_torque)
+            thrust_per_engine = effective_thrust_magnitude / self.vehicle.num_engines
+            gimbal_angles_list, rcs_levels, achieved_torque = self.get_actuator_commands(
+                unsaturated_torque, thrust_per_engine, gimbal_arm
+            )
 
-            # Anti-windup: Recalculate integral error based on saturated torque
-            # Skip axes where ki=0 to avoid division by zero
+            # Anti-windup - limit integral error based on saturation (if achieved_torque != unsaturated_torque)
             mask = self.ki != 0
-            self.integral_error[mask] = (control_torque[mask] - p_term[mask] - d_term[mask]) / self.ki[mask]
+            self.integral_error[mask] = (achieved_torque[mask] - p_term[mask] - d_term[mask]) / self.ki[mask]
 
-            effective_thrust_e = effective_thrust_magnitude / self.vehicle.num_engines
-            gimbal_angles_list, rcs_levels = self.get_actuator_commands(control_torque, effective_thrust_e, gimbal_arm)
         else:
+            # Everything is passive
             gimbal_angles_list = []
             for engine in range(len(self.vehicle.engines)):
                 gimbal_angles_list.append([0, 0])
-            control_torque = np.zeros(3)
+            unsaturated_torque = np.zeros(3)
             throttle = 0.0
             rcs_levels = np.zeros(len(self.vehicle.rcs_thrusters))
             desired_quaternion = current_quaternion
@@ -209,16 +203,15 @@ class PIDAttitudeController(Controller):
                 f"PID p term: {np.round(p_term, 4)} | PID i term: {np.round(i_term, 4)} | PID d term: {np.round(d_term, 4)}"
             )
         return {
-            "desired_torque": control_torque,
+            "desired_torque": unsaturated_torque,
             "engine_gimbal_angles": gimbal_angles_list,
             "throttle": throttle,
-            "propellant_mass": current_propellant_mass,
             "rcs_levels": rcs_levels,
         }
 
     def get_actuator_commands(
         self, desired_torque: np.ndarray, effective_thrust_e: float, gimbal_arm: float
-    ) -> tuple[list, np.ndarray]:
+    ) -> tuple[list, np.ndarray, np.ndarray]:
         """
         Allocate desired torque to engine gimbals and RCS thrusters.
 
@@ -231,22 +224,23 @@ class PIDAttitudeController(Controller):
             Tuple containing:
                 - list of [pitch, yaw] gimbal angles (rad) for each engine
                 - array of RCS throttle levels (0 to 1) for each RCS thruster
+                - the actual achieved torque from engines + RCS
         """
         sin_lim = np.sin(self.vehicle.engine_gimbal_limit_rad)
         num_engines = self.vehicle.num_engines
-        num_gimbal_dofs = 2 * num_engines
-        A = np.zeros((3, num_gimbal_dofs))
+        num_gimbals = 2 * num_engines
+        A = np.zeros((3, num_gimbals))
 
         for i in range(num_engines):
             pos = self.vehicle.engines[i]["position"].copy()
             pos[2] = -gimbal_arm
 
-            # Pitch dof
+            # Pitch
             delta_f_pitch = np.array([0.0, -effective_thrust_e, 0.0])
             torque_pitch = np.cross(pos, delta_f_pitch)
             A[:, 2 * i] = torque_pitch
 
-            # Yaw dof
+            # Yaw
             delta_f_yaw = np.array([effective_thrust_e, 0.0, 0.0])
             torque_yaw = np.cross(pos, delta_f_yaw)
             A[:, 2 * i + 1] = torque_yaw
@@ -279,6 +273,8 @@ class PIDAttitudeController(Controller):
             residual = np.where(np.abs(residual) < 1e-12, 0.0, residual)
 
             rcs_levels, _ = nnls(A_rcs, residual)
+            achieved_rcs_torque = A_rcs @ rcs_levels
+            achieved_torque += achieved_rcs_torque
 
             if np.any(rcs_levels > 1):
                 max_level = np.max(rcs_levels)
@@ -286,4 +282,4 @@ class PIDAttitudeController(Controller):
         else:
             rcs_levels = np.array([])
 
-        return gimbal_angles_list, rcs_levels
+        return gimbal_angles_list, rcs_levels, achieved_torque
