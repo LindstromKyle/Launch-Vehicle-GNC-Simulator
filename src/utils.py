@@ -281,3 +281,26 @@ def compute_acceleration(t_vals: np.ndarray, velocity_vals: np.ndarray) -> np.nd
     """
     acceleration_vals = np.gradient(velocity_vals, t_vals)
     return acceleration_vals
+
+
+def quaternion_from_attitude_mode(state_vector, attitude_mode):
+
+    position = state_vector[:3]
+    velocity = state_vector[3:6]
+    radial_unit_vector = position / np.linalg.norm(position)
+    velocity_magnitude = np.linalg.norm(velocity)
+
+    if attitude_mode == "radial":
+        desired_z_vector = radial_unit_vector
+    elif attitude_mode == "prograde":
+        desired_z_vector = velocity / velocity_magnitude
+    elif attitude_mode == "retrograde":
+        desired_z_vector = -velocity / velocity_magnitude
+    elif attitude_mode == "radial_down":
+        desired_z_vector = -radial_unit_vector
+    elif attitude_mode == "passive":
+        # Set desired to current quaternion (no control needed)
+        desired_quaternion = state_vector[6:10].copy()
+        desired_quaternion /= np.linalg.norm(desired_quaternion)  # Normalize for safety
+        return desired_quaternion
+    return compute_body_z_to_inertial_quat(desired_z_vector)

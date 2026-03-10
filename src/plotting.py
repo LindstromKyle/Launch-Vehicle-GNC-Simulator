@@ -19,7 +19,7 @@ def plot_3D_integration_segments(
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection="3d")
 
-    # Define colors for phases
+    # Define colors for guidance_phases
     phase_colors = {
         "Initial Ascent": "gray",
         "Stage 1 Pitch Program": "magenta",
@@ -72,7 +72,7 @@ def plot_3D_integration_segments(
     ax.set_xlabel("X (km)")
     ax.set_ylabel("Y (km)")
     ax.set_zlabel("Z (km)")
-    ax.set_title("3D Rocket Trajectory by Phase")
+    ax.set_title("3D Rocket Trajectory by GuidancePhase")
     ax.legend()
     ax.grid(True)
     plt.tight_layout()

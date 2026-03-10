@@ -2,15 +2,14 @@ import numpy as np
 
 from controller import PIDAttitudeController
 from environment import Environment
-from guidance import ModeBasedGuidance
-from mission import (
-    TimeBasedPhase,
-    ProgrammedPitchPhase,
-    MissionPlanner,
-    CoastPhase,
-    CircBurnPhase,
-    PEGPhase,
+from guidance import (
+    TimeBasedGuidancePhase,
+    ProgrammedPitchGuidancePhase,
+    PEGGuidancePhase,
+    CoastGuidancePhase,
+    CircBurnGuidancePhase,
 )
+from mission import MissionPlanner
 from plotting import plot_3D_integration_segments
 from simulator import Simulator
 from state import State
@@ -67,6 +66,7 @@ stage_1 = Falcon9FirstStage(
 
 # Environment
 environment = Environment()
+mu = environment.gravitational_constant * environment.earth_mass
 
 # Launch site parameters
 launch_latitude_deg = 28.5  # Cape Canaveral
@@ -86,6 +86,12 @@ initial_quaternion = compute_body_z_to_inertial_quat(radial_unit_vector)
 # Initial kick east during pitch program
 kick_direction = rotate_body_to_inertial_by_quat(np.array([0, 1, 0]), initial_quaternion)
 
+# Find orbital normal
+horizontal_projection = kick_direction - np.dot(kick_direction, radial_unit_vector) * radial_unit_vector
+horizontal_unit = horizontal_projection / np.linalg.norm(horizontal_projection)
+orbital_normal = np.cross(radial_unit_vector, horizontal_unit)
+orbital_normal /= np.linalg.norm(orbital_normal)
+
 # State
 initial_state = State(
     position=initial_position,
@@ -100,11 +106,13 @@ pitch_start_time = 10.0
 
 # Phases
 stage1_phases = [
-    TimeBasedPhase(end_time=pitch_start_time, attitude_mode="radial", throttle=1.0, name="Initial Ascent"),
-    ProgrammedPitchPhase(
+    TimeBasedGuidancePhase(end_time=pitch_start_time, attitude_mode="radial", throttle=1.0, name="Initial Ascent"),
+    ProgrammedPitchGuidancePhase(
+        start_time=pitch_start_time,
         end_time=burnout_time,
         initial_pitch_deg=90,
         final_pitch_deg=23.1,
+        orbital_normal=orbital_normal,
         kick_direction=kick_direction,
         throttle=1.0,
         name="Stage 1 Pitch Program",
@@ -112,15 +120,9 @@ stage1_phases = [
 ]
 
 # Mission Planner
-stage1_planner = MissionPlanner(phases=stage1_phases, environment=environment, vehicle=stage_1, start_time=0.0)
-
-horizontal_projection = kick_direction - np.dot(kick_direction, radial_unit_vector) * radial_unit_vector
-horizontal_unit = horizontal_projection / np.linalg.norm(horizontal_projection)
-orbital_normal = np.cross(radial_unit_vector, horizontal_unit)
-orbital_normal /= np.linalg.norm(orbital_normal)
-
-# Guidance
-stage1_guidance = ModeBasedGuidance(orbital_normal=orbital_normal, environment=environment)
+stage1_planner = MissionPlanner(
+    guidance_phases=stage1_phases, environment=environment, vehicle=stage_1, start_time=0.0
+)
 
 # Controller gains
 stage1_p = 6e3
@@ -139,7 +141,6 @@ ascent_controller = PIDAttitudeController(
 stage1_sim = Simulator(
     vehicle=stage_1,
     environment=environment,
-    guidance=stage1_guidance,
     initial_state=initial_state,
     mission_planner=stage1_planner,
     t_0=0,
@@ -196,9 +197,12 @@ burnout_dot = np.dot(burnout_z_unit_vector, burnout_radial_unit_vector)
 burnout_pitch = np.rad2deg(np.pi / 2 - np.arccos(np.clip(burnout_dot, -1.0, 1.0)))
 
 stage2_phases = [
-    PEGPhase(
+    PEGGuidancePhase(
         target_apoapsis=target_apoapsis,
         target_periapsis=target_periapsis,
+        orbital_normal=orbital_normal,
+        vehicle=stage_2,
+        mu=mu,
         target_inclination=None,
         apo_tolerance=10000.0,
         peri_tolerance=20000.0,
@@ -208,15 +212,16 @@ stage2_phases = [
         throttle=1.0,
         name="Stage 2 Ascent Burn",
     ),
-    CoastPhase(
+    CoastGuidancePhase(
+        vehicle=stage_2,
+        mu=mu,
         time_to_apo_threshold=30.0,
         attitude_mode="prograde",
-        throttle=0.0,
         name="Coast",
         buffer=5.0,
         use_dynamic_threshold=False,
     ),
-    CircBurnPhase(
+    CircBurnGuidancePhase(
         attitude_mode="prograde",
         throttle=1.0,
         name="Circularization",
@@ -224,15 +229,12 @@ stage2_phases = [
         throttle_kp=20.0,
         target_eccentricity=0.0011,
     ),
-    TimeBasedPhase(end_time=simulation_end_time, attitude_mode="passive", throttle=0.0, name="Orbit"),
+    TimeBasedGuidancePhase(end_time=simulation_end_time, attitude_mode="passive", throttle=0.0, name="Orbit"),
 ]
 
 stage2_planner = MissionPlanner(
-    phases=stage2_phases, environment=environment, vehicle=stage_2, start_time=separation_time
+    guidance_phases=stage2_phases, environment=environment, vehicle=stage_2, start_time=separation_time
 )
-
-orbital_normal = stage1_guidance.orbital_normal
-stage2_guidance = ModeBasedGuidance(orbital_normal=orbital_normal, environment=environment)
 
 stage2_p = 3e3
 stage2_i = 0
@@ -248,7 +250,6 @@ controller_stage2 = PIDAttitudeController(
 sim_stage2 = Simulator(
     vehicle=stage_2,
     environment=environment,
-    guidance=stage2_guidance,
     initial_state=current_state,
     mission_planner=stage2_planner,
     t_0=separation_time,

@@ -5,7 +5,6 @@ from tqdm import tqdm
 from controller import Controller
 from dynamics import calculate_dynamics
 from environment import Environment
-from guidance import Guidance
 from mission import MissionPlanner
 from utils import angle_axis_to_quat, quaternion_multiply
 from vehicle import Vehicle
@@ -128,7 +127,6 @@ def integrate_rk4(
 def integrate_verlet(
     vehicle: Vehicle,
     environment: Environment,
-    guidance: Guidance,
     initial_state: np.ndarray,
     t_0: float,
     t_final: float,
@@ -143,7 +141,6 @@ def integrate_verlet(
     Args:
         vehicle: Vehicle model instance
         environment: Environment model instance
-        guidance: Guidance instance
         initial_state: Initial full state vector
         t_0: Start time (seconds)
         t_final: End time of simulation (seconds)
@@ -185,7 +182,8 @@ def integrate_verlet(
         attitude_mode = setpoints.get("attitude_mode")
 
         # Desired quaternion from guidance
-        desired_quaternion = guidance.get_desired_quaternion(current_time, current_state, setpoints)
+        guidance = mission_planner.current_phase
+        desired_quaternion = guidance.get_desired_quaternion(current_time, current_state)
         desired_quaternion /= np.linalg.norm(desired_quaternion)
 
         # Controller update
