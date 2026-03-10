@@ -151,7 +151,7 @@ stage1_sim = Simulator(
 )
 stage1_sim.add_controller(ascent_controller)
 
-print(f"Simulating Ascent...")
+print(f"---------- INTEGRATION SEGMENT 1 ----------")
 stage1_t_vals, stage1_state_vals, stage1_phase_transitions = stage1_sim.run()
 
 """
@@ -202,7 +202,7 @@ stage2_phases = [
         target_periapsis=target_periapsis,
         orbital_normal=orbital_normal,
         vehicle=stage_2,
-        mu=mu,
+        environment=environment,
         target_inclination=None,
         apo_tolerance=10000.0,
         peri_tolerance=20000.0,
@@ -214,7 +214,7 @@ stage2_phases = [
     ),
     CoastGuidancePhase(
         vehicle=stage_2,
-        mu=mu,
+        environment=environment,
         time_to_apo_threshold=30.0,
         attitude_mode="prograde",
         name="Coast",
@@ -222,6 +222,7 @@ stage2_phases = [
         use_dynamic_threshold=False,
     ),
     CircBurnGuidancePhase(
+        environment=environment,
         attitude_mode="prograde",
         throttle=1.0,
         name="Circularization",
@@ -260,7 +261,7 @@ sim_stage2 = Simulator(
 )
 sim_stage2.add_controller(controller_stage2)
 
-print("\nSimulating Stage 2 to Orbit...")
+print("\n---------- INTEGRATION SEGMENT 2 ----------")
 stage2_t_vals, stage2_state_vals, stage2_phase_transitions = sim_stage2.run()
 
 # Combine phase transitions for plotting

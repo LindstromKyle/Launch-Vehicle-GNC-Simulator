@@ -19,10 +19,10 @@ class Controller(ABC):
         self,
         time: float,
         state_vector: np.ndarray,
-        throttle: float,
-        attitude_mode: str,
         desired_quaternion: np.ndarray,
+        throttle: float,
         log_flag: bool,
+        attitude_mode: str,
     ) -> dict:
         """
         Compute control inputs for the current time step.
@@ -30,10 +30,10 @@ class Controller(ABC):
         Args:
             time: Current simulation time (seconds)
             state_vector: Full state vector [pos, vel, quat, ang_vel, prop_mass]
-            throttle: Throttle modulation value
-            attitude_mode: Current mission planner attitude mode
             desired_quaternion: Current desired quaternion from guidance
+            throttle: Throttle modulation value
             log_flag: Whether to log information this step
+            attitude_mode: Attitude mode from guidance (for logging only)
 
         Returns:
             Dictionary containing control commands (gimbal angles, RCS levels)
@@ -50,7 +50,7 @@ class PIDAttitudeController(Controller):
         kp: Proportional gain vector [x, y, z] (N·m/rad)
         ki: Integral gain vector [x, y, z] (N·m/rad·s)
         kd: Derivative gain vector [x, y, z] (N·m/(rad/s))
-        vehicle: Vehicle instance providing engine and RCS configuration
+        vehicle: Vehicle instance
     """
 
     def __init__(
@@ -75,10 +75,10 @@ class PIDAttitudeController(Controller):
         self,
         time: float,
         state_vector: np.ndarray,
-        throttle: float,
-        attitude_mode: str,
         desired_quaternion: np.ndarray,
+        throttle: float,
         log_flag: bool,
+        attitude_mode: str,
     ) -> dict:
         """
         Compute control inputs for the current time step.
@@ -86,18 +86,20 @@ class PIDAttitudeController(Controller):
         Args:
             time: Current simulation time (seconds)
             state_vector: Full state vector [pos, vel, quat, ang_vel, prop_mass]
-            throttle: Throttle modulation value
-            attitude_mode: Current guidance attitude mode
             desired_quaternion: Current desired quaternion from guidance
+            throttle: Throttle modulation value
             log_flag: Whether to log information this step
+            attitude_mode: Attitude mode from guidance (for logging only)
 
         Returns:
             Dictionary containing control commands (gimbal angles, RCS levels)
         """
         current_propellant_mass = state_vector[13]
         current_quaternion = state_vector[6:10]
-        if attitude_mode != "passive":
+        current_quaternion /= np.linalg.norm(current_quaternion)
 
+        # Check if the guidance is in passive mode
+        if not np.all(desired_quaternion == current_quaternion):
             # Compute quaternion error
             error_quaternion = quaternion_multiply(desired_quaternion, quaternion_inverse(current_quaternion))
             error_quaternion /= np.linalg.norm(error_quaternion)

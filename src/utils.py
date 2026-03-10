@@ -283,7 +283,7 @@ def compute_acceleration(t_vals: np.ndarray, velocity_vals: np.ndarray) -> np.nd
     return acceleration_vals
 
 
-def quaternion_from_attitude_mode(state_vector, attitude_mode):
+def quaternion_from_attitude_mode(state_vector: np.ndarray, attitude_mode: str) -> np.ndarray:
 
     position = state_vector[:3]
     velocity = state_vector[3:6]
@@ -301,6 +301,6 @@ def quaternion_from_attitude_mode(state_vector, attitude_mode):
     elif attitude_mode == "passive":
         # Set desired to current quaternion (no control needed)
         desired_quaternion = state_vector[6:10].copy()
-        desired_quaternion /= np.linalg.norm(desired_quaternion)  # Normalize for safety
+        desired_quaternion /= np.linalg.norm(desired_quaternion)
         return desired_quaternion
     return compute_body_z_to_inertial_quat(desired_z_vector)

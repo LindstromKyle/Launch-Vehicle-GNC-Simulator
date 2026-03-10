@@ -29,35 +29,34 @@ class MissionPlanner:
         self.phase_transitions = [(start_time, guidance_phases[0].name)]
         self.mu = environment.gravitational_constant * environment.earth_mass
 
-    def update(self, time: float, state_vector: np.ndarray, log_flag: bool) -> dict:
+    def update(self, time: float, state_vector: np.ndarray, log_flag: bool):
         """
-        Get current phase setpoints and check for phase transitions.
+        Updates phase and checks for completion.
 
         Args:
             time: Current simulation time (seconds)
             state_vector: Full state vector
             log_flag: Whether to log status this step
 
-        Returns:
-            Dictionary of current setpoints (Throttle and attitude mode)
         """
-        position = state_vector[0:3]
-        velocity = state_vector[3:6]
-
-        elements = compute_orbital_elements(position, velocity, self.mu)
-        altitude = (np.linalg.norm(position) - self.environment.earth_radius) / 1000
 
         self.current_phase = self.guidance_phases[self.current_phase_idx]
-        if self.current_phase.is_complete(time, state_vector, elements):
+        if self.current_phase.is_complete(time, state_vector):
+            print(f"\n'{self.current_phase.name}' phase complete at t = {time:.2f}s.")
             self.current_phase_idx += 1
             if self.current_phase_idx < len(self.guidance_phases):
                 self.phase_transitions.append((time, self.guidance_phases[self.current_phase_idx].name))
             else:
-                logging.info(f"Integration segment complete at t={time:.2f}")
+                logging.info(f"Integration segment complete at t = {time:.2f}s")
                 return {"throttle": 0.0, "attitude_mode": "prograde"}
             self.current_phase = self.guidance_phases[self.current_phase_idx]
+            print(f"Starting '{self.current_phase.name}' phase.")
 
         if log_flag:
+            position = state_vector[0:3]
+            velocity = state_vector[3:6]
+            elements = compute_orbital_elements(position, velocity, self.mu)
+            altitude = (np.linalg.norm(position) - self.environment.earth_radius) / 1000
             # Full orbital velocity
             r_unit_vector = position / np.linalg.norm(position)
             orbital_velocity = np.linalg.norm(velocity)
@@ -80,10 +79,6 @@ class MissionPlanner:
             logging.info(
                 f"orbital vel (km/s): {orbital_velocity/1000:.4f} | tangential vel (km/s): {tangential_velocity/1000:.4f} | radial vel (km/s): {radial_velocity/1000:.4f}"
             )
-
-        # Get base setpoints from phase
-        setpoints = self.current_phase.get_setpoints(time, state_vector, elements)
-        return setpoints
 
     def get_phase_transitions(self) -> list[tuple[float, str]]:
         """

@@ -165,7 +165,7 @@ def integrate_verlet(
 
     # Progress bar
     max_iterations = int(np.floor((t_final - t_0) / delta_t))
-    p_bar = tqdm(total=max_iterations, desc="Velocity Verlet", leave=True)
+    p_bar = tqdm(total=max_iterations, desc="Velocity Verlet...", leave=True)
 
     while current_time < t_final:
         # Logging
@@ -177,18 +177,17 @@ def integrate_verlet(
         h = min(delta_t, t_final - current_time)
 
         # Mission planner update
-        setpoints = mission_planner.update(current_time, current_state, log_flag)
-        throttle = setpoints.get("throttle")
-        attitude_mode = setpoints.get("attitude_mode")
+        mission_planner.update(current_time, current_state, log_flag)
 
-        # Desired quaternion from guidance
+        # Get desired quaternion and throttle from guidance
         guidance = mission_planner.current_phase
-        desired_quaternion = guidance.get_desired_quaternion(current_time, current_state)
+        desired_quaternion, throttle = guidance.get_setpoints(current_time, current_state)
         desired_quaternion /= np.linalg.norm(desired_quaternion)
+        attitude_mode = guidance.attitude_mode
 
         # Controller update
         controls = controller.update(
-            current_time, current_state, throttle, attitude_mode, desired_quaternion, log_flag
+            current_time, current_state, desired_quaternion, throttle, log_flag, attitude_mode
         )
 
         # Dynamics
