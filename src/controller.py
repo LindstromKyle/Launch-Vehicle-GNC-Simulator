@@ -4,7 +4,6 @@ import numpy as np
 from scipy.optimize import nnls
 from abc import ABC, abstractmethod
 
-from guidance import Guidance
 from utils import quaternion_multiply, quaternion_inverse, quat_to_angle_axis, rotate_body_to_inertial_by_quat
 from vehicle import Vehicle
 
@@ -16,18 +15,28 @@ class Controller(ABC):
     """
 
     @abstractmethod
-    def update(self, time: float, state_vector: np.ndarray, mission_planner_setpoints: dict, log_flag: bool) -> dict:
+    def update(
+        self,
+        time: float,
+        state_vector: np.ndarray,
+        throttle: float,
+        attitude_mode: str,
+        desired_quaternion: np.ndarray,
+        log_flag: bool,
+    ) -> dict:
         """
         Compute control inputs for the current time step.
 
         Args:
             time: Current simulation time (seconds)
             state_vector: Full state vector [pos, vel, quat, ang_vel, prop_mass]
-            mission_planner_setpoints: Dictionary of current mission setpoints
+            throttle: Throttle modulation value
+            attitude_mode: Current mission planner attitude mode
+            desired_quaternion: Current desired quaternion from guidance
             log_flag: Whether to log information this step
 
         Returns:
-            Dictionary containing control commands (throttle, gimbal angles, etc.)
+            Dictionary containing control commands (gimbal angles, RCS levels)
         """
         pass
 
@@ -41,7 +50,6 @@ class PIDAttitudeController(Controller):
         kp: Proportional gain vector [x, y, z] (N·m/rad)
         ki: Integral gain vector [x, y, z] (N·m/rad·s)
         kd: Derivative gain vector [x, y, z] (N·m/(rad/s))
-        guidance: Guidance instance used to compute desired quaternion
         vehicle: Vehicle instance providing engine and RCS configuration
     """
 
@@ -50,14 +58,12 @@ class PIDAttitudeController(Controller):
         kp: np.ndarray,
         ki: np.ndarray,
         kd: np.ndarray,
-        guidance: Guidance,
         vehicle: Vehicle,
     ):
         # Copy PID gains to allow modification
         self.kp = kp.copy()
         self.ki = ki.copy()
         self.kd = kd.copy()
-        self.guidance = guidance
         self.integral_error = np.zeros(3)
         self.previous_error = np.zeros(3)
         self.previous_d_term = np.zeros(3)
@@ -65,31 +71,32 @@ class PIDAttitudeController(Controller):
         self.prev_error_quat = np.array([1.0, 0.0, 0.0, 0.0])
         self.vehicle = vehicle
 
-    def update(self, time: float, state_vector: np.ndarray, mission_planner_setpoints: dict, log_flag: bool) -> dict:
+    def update(
+        self,
+        time: float,
+        state_vector: np.ndarray,
+        throttle: float,
+        attitude_mode: str,
+        desired_quaternion: np.ndarray,
+        log_flag: bool,
+    ) -> dict:
         """
-        Main control loop step: compute gimbal angles, RCS levels, and throttle.
+        Compute control inputs for the current time step.
 
         Args:
             time: Current simulation time (seconds)
-            state_vector: Full state vector
-            mission_planner_setpoints: Current mission phase setpoints
-            log_flag: Whether logging should occur this step
+            state_vector: Full state vector [pos, vel, quat, ang_vel, prop_mass]
+            throttle: Throttle modulation value
+            attitude_mode: Current guidance attitude mode
+            desired_quaternion: Current desired quaternion from guidance
+            log_flag: Whether to log information this step
 
         Returns:
-            Dictionary with keys: desired_torque, engine_gimbal_angles, throttle,
-                                 propellant_mass, rcs_levels
+            Dictionary containing control commands (gimbal angles, RCS levels)
         """
         current_propellant_mass = state_vector[13]
         current_quaternion = state_vector[6:10]
-        attitude_mode = mission_planner_setpoints.get("attitude_mode", "prograde")
         if attitude_mode != "passive":
-
-            # Throttle
-            throttle = mission_planner_setpoints.get("throttle", 1.0)
-
-            # Get desired quaternion from guidance
-            desired_quaternion = self.guidance.get_desired_quaternion(time, state_vector, mission_planner_setpoints)
-            desired_quaternion /= np.linalg.norm(desired_quaternion)
 
             # Compute quaternion error
             error_quaternion = quaternion_multiply(desired_quaternion, quaternion_inverse(current_quaternion))
@@ -169,7 +176,6 @@ class PIDAttitudeController(Controller):
             p_term = np.zeros(3)
             i_term = np.zeros(3)
             d_term = np.zeros(3)
-            self.guidance.current_attitude_mode = "passive"
 
         if log_flag:
             current_z_unit_vector = rotate_body_to_inertial_by_quat(np.array([0, 0, 1]), current_quaternion)
@@ -182,7 +188,7 @@ class PIDAttitudeController(Controller):
             current_pitch = np.rad2deg(np.pi / 2 - np.arccos(np.clip(current_dot, -1.0, 1.0)))
             desired_pitch = np.rad2deg(np.pi / 2 - np.arccos(np.clip(desired_dot, -1.0, 1.0)))
             logging.info(f"------------------------------------[GUIDANCE]--------------------------------------------")
-            logging.info(f"attitude mode: {self.guidance.current_attitude_mode}")
+            logging.info(f"attitude mode: {attitude_mode}")
             logging.info(
                 f"current quat: {np.round(current_quaternion, 4)} | current attitude (z_hat): {np.round(current_z_unit_vector, 4)}"
             )
@@ -202,10 +208,9 @@ class PIDAttitudeController(Controller):
             logging.info(
                 f"PID p term: {np.round(p_term, 4)} | PID i term: {np.round(i_term, 4)} | PID d term: {np.round(d_term, 4)}"
             )
+            logging.info(f"desired torque (N*m): {np.round(unsaturated_torque, 4)} | throttle: {throttle:.4f}")
         return {
-            "desired_torque": unsaturated_torque,
             "engine_gimbal_angles": gimbal_angles_list,
-            "throttle": throttle,
             "rcs_levels": rcs_levels,
         }
 

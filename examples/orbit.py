@@ -132,7 +132,6 @@ ascent_controller = PIDAttitudeController(
     kp=np.array([stage1_p, stage1_p, 1.5 * stage1_p]),
     ki=np.array([stage1_i, stage1_i, 1.5 * stage1_i]),
     kd=np.array([stage1_d, stage1_d, 1.5 * stage1_d]),
-    guidance=stage1_guidance,
     vehicle=stage_1,
 )
 
@@ -140,6 +139,7 @@ ascent_controller = PIDAttitudeController(
 stage1_sim = Simulator(
     vehicle=stage_1,
     environment=environment,
+    guidance=stage1_guidance,
     initial_state=initial_state,
     mission_planner=stage1_planner,
     t_0=0,
@@ -242,13 +242,13 @@ controller_stage2 = PIDAttitudeController(
     kp=np.array([stage2_p, stage2_p, 2 * stage2_p]),
     ki=np.array([stage2_i, stage2_i, 2 * stage2_i]),
     kd=np.array([stage2_d, stage2_d, 2 * stage2_d]),
-    guidance=stage2_guidance,
     vehicle=stage_2,
 )
 
 sim_stage2 = Simulator(
     vehicle=stage_2,
     environment=environment,
+    guidance=stage2_guidance,
     initial_state=current_state,
     mission_planner=stage2_planner,
     t_0=separation_time,

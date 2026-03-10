@@ -2,6 +2,7 @@ import logging
 import numpy as np
 
 from environment import Environment
+from guidance import Guidance
 from integrator import integrate_rk4, integrate_verlet
 from mission import MissionPlanner
 from state import State
@@ -16,6 +17,7 @@ class Simulator:
     Args:
         vehicle: The rocket Vehicle instance
         environment: Environment instance
+        guidance: Guidance instance
         initial_state: Starting state vector
         mission_planner: MissionPlanner instance
         t_0: Start time of simulation (seconds)
@@ -29,6 +31,7 @@ class Simulator:
         self,
         vehicle: Vehicle,
         environment: Environment,
+        guidance: Guidance,
         initial_state: State,
         mission_planner: MissionPlanner,
         t_0: float = 0,
@@ -40,6 +43,7 @@ class Simulator:
 
         self.vehicle = vehicle
         self.environment = environment
+        self.guidance = guidance
         self.initial_state = initial_state
         self.t_0 = t_0
         self.t_final = t_final
@@ -80,6 +84,7 @@ class Simulator:
         t_vals, state_vals, phase_transitions = integrate_verlet(
             vehicle=self.vehicle,
             environment=self.environment,
+            guidance=self.guidance,
             initial_state=self.initial_state.as_vector(),
             t_0=self.t_0,
             t_final=self.t_final,

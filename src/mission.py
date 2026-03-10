@@ -145,7 +145,6 @@ class CircBurnPhase(Phase):
     Circularization burn phase — raises periapsis to target altitude.
 
     Args:
-        peri_tolerance_factor: Fraction of target periapsis considered "close enough"
         attitude_mode: Attitude mode to hold while burning
         throttle: Maximum throttle level
         name: Name of the phase

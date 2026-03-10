@@ -10,7 +10,7 @@ warnings.filterwarnings("error", category=RuntimeWarning)
 
 
 def calculate_dynamics(
-    state: np.ndarray, vehicle: Vehicle, environment: Environment, log_flag: bool, controls: dict
+    state: np.ndarray, vehicle: Vehicle, environment: Environment, throttle: float, controls: dict, log_flag: bool
 ) -> np.ndarray:
     """
     Calculates linear and angular state derivatives, as well as mass flow rate.
@@ -19,8 +19,9 @@ def calculate_dynamics(
         state: Full state vector [position, velocity, quaternion, angular_velocity, propellant_mass]
         vehicle: Vehicle object
         environment: Environment object
+        throttle: Current throttle level from guidance
+        controls: Dictionary of control inputs (gimbal angles, RCS levels)
         log_flag: Whether to write detailed logging this timestep
-        controls: Dictionary of control inputs (throttle, gimbal angles, RCS levels, etc.)
 
     Returns:
         Derivatives of the state vector (same shape as state)
@@ -35,10 +36,8 @@ def calculate_dynamics(
     vehicle_mass = vehicle.dry_mass + max(propellant_mass, 0)
 
     # Controller logic
-    throttle = controls.get("throttle")
     gimbal_angles = controls.get("engine_gimbal_angles")
     rcs_levels = controls.get("rcs_levels")
-    desired_torque = controls.get("desired_torque")
 
     # Check throttle and remaining propellant
     if throttle > 0 and propellant_mass > 0:
@@ -75,7 +74,6 @@ def calculate_dynamics(
 
     # Log state evolution
     if log_flag:
-        logging.info(f"desired torque (N*m): {np.round(desired_torque, 4)} | throttle: {throttle:.4f}")
         logging.info(
             f"applied torque (N*m): {np.round(total_torque, 4)} | ang vel (rad/s): {np.round(angular_velocity, 4)} | ang acc (rad/s/s): {np.round(angular_acceleration, 4)}"
         )

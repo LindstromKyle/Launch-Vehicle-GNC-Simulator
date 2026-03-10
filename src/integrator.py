@@ -5,6 +5,7 @@ from tqdm import tqdm
 from controller import Controller
 from dynamics import calculate_dynamics
 from environment import Environment
+from guidance import Guidance
 from mission import MissionPlanner
 from utils import angle_axis_to_quat, quaternion_multiply
 from vehicle import Vehicle
@@ -63,7 +64,7 @@ def integrate_rk4(
         # Calculate step size, ensure we don’t overshoot
         h = min(delta_t, t_final - current_time)
 
-        # Mission planner setpoints
+        # Mission planner update
         setpoints = mission_planner.update(current_time, current_state, log_flag)
         # Controller update
         controls = controller.update(current_time, current_state, setpoints, log_flag)
@@ -127,6 +128,7 @@ def integrate_rk4(
 def integrate_verlet(
     vehicle: Vehicle,
     environment: Environment,
+    guidance: Guidance,
     initial_state: np.ndarray,
     t_0: float,
     t_final: float,
@@ -141,6 +143,7 @@ def integrate_verlet(
     Args:
         vehicle: Vehicle model instance
         environment: Environment model instance
+        guidance: Guidance instance
         initial_state: Initial full state vector
         t_0: Start time (seconds)
         t_final: End time of simulation (seconds)
@@ -176,17 +179,28 @@ def integrate_verlet(
         # Step size
         h = min(delta_t, t_final - current_time)
 
-        # Get controls and current acceleration/torque
+        # Mission planner update
         setpoints = mission_planner.update(current_time, current_state, log_flag)
-        controls = controller.update(current_time, current_state, setpoints, log_flag)
+        throttle = setpoints.get("throttle")
+        attitude_mode = setpoints.get("attitude_mode")
+
+        # Desired quaternion from guidance
+        desired_quaternion = guidance.get_desired_quaternion(current_time, current_state, setpoints)
+        desired_quaternion /= np.linalg.norm(desired_quaternion)
+
+        # Controller update
+        controls = controller.update(
+            current_time, current_state, throttle, attitude_mode, desired_quaternion, log_flag
+        )
 
         # Dynamics
         deriv_current = calculate_dynamics(
             state=current_state,
             vehicle=vehicle,
             environment=environment,
-            log_flag=log_flag,
+            throttle=throttle,
             controls=controls,
+            log_flag=log_flag,
         )
         acc_current = deriv_current[3:6]
         ang_acc_current = deriv_current[10:13]
@@ -222,8 +236,9 @@ def integrate_verlet(
             state=current_state,
             vehicle=vehicle,
             environment=environment,
-            log_flag=False,
+            throttle=throttle,
             controls=controls,
+            log_flag=False,
         )
         acc_new = deriv_new[3:6]
         ang_acc_new = deriv_new[10:13]
