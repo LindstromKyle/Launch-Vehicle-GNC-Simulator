@@ -1,8 +1,7 @@
 import logging
-from typing import Tuple
-
 import numpy as np
 
+from typing import Tuple
 from abc import ABC, abstractmethod
 
 from environment import Environment
@@ -162,7 +161,7 @@ class PEGGuidancePhase(GuidancePhase):
         peri_tolerance: Acceptable error in periapsis (m)
         min_throttle: Minimum throttle during terminal guidance
         throttle_kp: Proportional gain for throttle adjustment near target
-        throttle_threshold_factor: Scaling factor for when to reduce throttle
+        throttle_threshold_factor: Scaling factor (multiply by tolerance for when to start throttling)
         throttle: Maximum throttle level
         name: Name of the phase
     """
@@ -187,7 +186,7 @@ class PEGGuidancePhase(GuidancePhase):
         self.target_periapsis = target_periapsis
         self.orbital_normal = orbital_normal
         self.vehicle = vehicle
-        self.target_a = (self.target_apoapsis + self.target_periapsis) / 2
+        self.target_sem_maj_axis = (self.target_apoapsis + self.target_periapsis) / 2
         self.target_e = (self.target_apoapsis - self.target_periapsis) / (self.target_apoapsis + self.target_periapsis)
         self.target_inclination = target_inclination
         self.apo_tolerance = apo_tolerance
@@ -202,11 +201,14 @@ class PEGGuidancePhase(GuidancePhase):
         self.mu = environment.gravitational_constant * environment.earth_mass
 
     def is_complete(self, time: float, state_vector: np.ndarray) -> bool:
+        # Compute orbital elements
         position = state_vector[0:3]
         velocity = state_vector[3:6]
         self.elements = compute_orbital_elements(position, velocity, self.mu)
+        # Check peri and apo
         apo_ok = abs(self.elements["apoapsis_radius"] - self.target_apoapsis) <= self.apo_tolerance
         peri_ok = abs(self.elements["periapsis_radius"] - self.target_periapsis) <= self.peri_tolerance
+        # Check inclination if specified
         inc_ok = True
         if self.target_inclination is not None:
             h_vec = np.cross(state_vector[:3], state_vector[3:6])
@@ -217,120 +219,151 @@ class PEGGuidancePhase(GuidancePhase):
         return apo_ok and peri_ok and inc_ok
 
     def get_setpoints(self, time: float, state_vector: np.ndarray) -> Tuple[np.ndarray, float]:
+        # Compute orbital elements
         position = state_vector[0:3]
         velocity = state_vector[3:6]
         if self.elements is None:
             self.elements = compute_orbital_elements(position, velocity, self.mu)
+
+        # Compute time to propellant depletion
         g0 = 9.80665
         thrust = self.vehicle.base_thrust_magnitude
         isp = self.vehicle.average_isp
         dry_mass = self.vehicle.dry_mass
         prop_mass = state_vector[13]
-        m = dry_mass + prop_mass
         v_e = isp * g0
         mdot = (thrust * self.throttle) / v_e if v_e > 0 else 1e-6
-        tau = m / mdot if mdot > 0 else 1e6
-        r = np.linalg.norm(position)
-        radial_unit = position / r
+        time_to_prop_deplete = prop_mass / mdot if mdot > 0 and prop_mass > 0 else 1e6
+
+        # Compute velocity vectors
+        position_magnitude = np.linalg.norm(position)
+        radial_unit = position / position_magnitude
         horizontal_projection = np.cross(self.orbital_normal, radial_unit)
         horizontal_unit = horizontal_projection / np.linalg.norm(horizontal_projection)
-        dr0 = np.dot(velocity, radial_unit)
-        v_theta0 = np.dot(velocity, horizontal_unit)
-        v_target = np.sqrt(self.mu * (2 / self.target_periapsis - 1 / self.target_a))
-        required_delta_v = max(0.0, v_target - v_theta0)
-        g = self.mu / r**2
-        centrifugal = v_theta0**2 / r if r > 0 else 0.0
+        current_radial_vel = np.dot(velocity, radial_unit)
+        current_tangential_vel = np.dot(velocity, horizontal_unit)
+
+        # Compute required delta V (diff between current and desired)
+        v_target = np.sqrt(self.mu * (2 / self.target_periapsis - 1 / self.target_sem_maj_axis))
+        required_delta_v = max(0.0, v_target - current_tangential_vel)
+
+        # Compute gravity
+        # TODO: this assumes constant gravity from this point to the end of burn
+        g = self.mu / position_magnitude**2
+        centrifugal = current_tangential_vel**2 / position_magnitude if position_magnitude > 0 else 0.0
         g_net = centrifugal - g
 
-        if required_delta_v <= 75.0:
+        # TODO: this PEG implementation seems to be unstable at small delta V. For now use prograde at
+        #  the end of the burn
+        if required_delta_v <= 500.0:
             logging.warning(f"PEG MODE - REQUIRED DELTA V SMALL: {required_delta_v}. DEFAULT TO CURRENT ATTITUDE")
             self.attitude_mode = "prograde"
             return state_vector[6:10], self.throttle
 
+        # Initial guess at time to go from rocket equation
         if required_delta_v > 0:
             exp_term = np.exp(-required_delta_v / v_e)
-            T = tau * (1 - exp_term)
+            time_to_go = time_to_prop_deplete * (1 - exp_term)
         else:
-            T = 0.1
-        T = np.clip(T, 0.1, tau * 0.99)
+            time_to_go = 0.1
+        # Clip to reasonable values
+        time_to_go = np.clip(time_to_go, 0.1, time_to_prop_deplete * 0.99)
+
+        # Refinement loop
+        # Convergence tolerance in m/s
         tol = 10
+        # Damping factor for corrections
         damping = 0.5
         for _ in range(100):
-            u = T / tau
-            if u >= 1:
-                u = 0.99
-                T = tau * u
-            log_term = max(1e-10, 1 - u)
+            burn_fraction = time_to_go / time_to_prop_deplete
+            log_term = max(1e-10, 1 - burn_fraction)
+            # 0th order thrust integral (m/s)
             b0 = -v_e * np.log(log_term)
-            b1 = tau * b0 - v_e * T
-            b2 = tau**2 * b0 - v_e * tau * T - 0.5 * v_e * T**2
-            c0 = b0 * T - b1
-            c1 = b1 * T - b2
-            rhs_dot = -dr0 - g_net * T
-            rhs_r = self.target_periapsis - r - dr0 * T - 0.5 * g_net * T**2
-            A_mat = np.array([[b0, b1], [c0, c1]])
-            det = np.linalg.det(A_mat)
+            # 1st order thurst integral (m)
+            b1 = time_to_prop_deplete * b0 - v_e * time_to_go
+            # 2nd order thurst integral (m*s)
+            b2 = time_to_prop_deplete**2 * b0 - v_e * time_to_prop_deplete * time_to_go - 0.5 * v_e * time_to_go**2
+            # 0th order position integral (m)
+            c0 = b0 * time_to_go - b1
+            # 1st order position integral (m*s)
+            c1 = b1 * time_to_go - b2
+            # Compute remaining radial position to go
+            rhs_dot = -current_radial_vel - g_net * time_to_go
+            rhs_r = (
+                self.target_periapsis
+                - position_magnitude
+                - current_radial_vel * time_to_go
+                - 0.5 * g_net * time_to_go**2
+            )
+
+            # Coefficient matrix
+            A_matrix = np.array([[b0, b1], [c0, c1]])
+            # Check for singular or ill conditioned
+            det = np.linalg.det(A_matrix)
             if abs(det) < 1e-6 or np.isnan(det):
                 print(f"PEG Convergence Failed at t={time}. Default Horizontal")
                 self.attitude_mode = "horizontal"
                 return compute_body_z_to_inertial_quat(horizontal_unit), self.throttle
 
-            sol = np.linalg.solve(A_mat, [rhs_dot, rhs_r])
-            A, B = sol
+            # Solve
+            solution = np.linalg.solve(A_matrix, [rhs_dot, rhs_r])
+            A, B = solution
+
+            # Compute achievable tangential delta v with these steering params and find error with desired delta v
             integral_fr2 = A**2 * b0 + 2 * A * B * b1 + B**2 * b2
             predicted = b0 - 0.5 * integral_fr2
             error = predicted - required_delta_v
+
+            # If within tolerance, done
             if abs(error) < tol:
                 break
-            der = max(1e-3, b0 / T)
-            T -= damping * error / der
-            T = np.clip(T, 0.1, tau * 0.99)
 
+            # Otherwise update time to go with Newton step (smaller if error is positive, larger if negative)
+            der = max(1e-3, b0 / time_to_go)
+            time_to_go -= damping * error / der
+            time_to_go = np.clip(time_to_go, 0.1, time_to_prop_deplete * 0.99)
+
+        # Radial component of desired thrust vector
+        # TODO: currently assuming the constant term alone [A] is a good approximation
         f_r = A
-        self.prev_f_r = f_r
-
-        t_thresh = 2
-        if T <= t_thresh:
-            f_r = self.prev_f_r * (T / t_thresh)
-
         f_r = np.clip(f_r, -1.0, 1.0)
-        f_n = 0.0
 
+        # Normal component of the desired thrust vector
+        f_n = 0.0
+        # No inclination correction unless user specifies
+        # TODO: this assumes the out of plane steering is small enough to be negligible when computing required
+        #  tangential term
         if self.target_inclination is not None:
+            # Angular momentum
             h_vec = np.cross(position, velocity)
             h_norm = np.linalg.norm(h_vec)
             if h_norm > 0:
+                # Current inclination
                 current_i = np.arccos(h_vec[2] / h_norm)
+                # Difference between current and desired
                 delta_i = np.deg2rad(self.target_inclination) - current_i
+                # Proportional control
                 k_out = 0.05
                 f_n = k_out * delta_i
                 f_n = np.clip(f_n, -0.3, 0.3)
 
+        # Tangential component of desired thurst vector
         f_theta = np.sqrt(max(0.0, 1 - f_r**2 - f_n**2))
+
+        # Construct desired thrust vector from three components
         desired_z_vector = f_r * radial_unit + f_theta * horizontal_unit + f_n * self.orbital_normal
-
-        # PEG smoothing
-        alpha = 0.995
-        if not hasattr(self, "last_desired_z"):
-            self.last_desired_z = desired_z_vector.copy()
-        desired_z_vector = alpha * desired_z_vector + (1 - alpha) * self.last_desired_z
-        self.last_desired_z = desired_z_vector.copy()
-
         desired_z_vector /= np.linalg.norm(desired_z_vector)
         desired_quaternion = compute_body_z_to_inertial_quat(desired_z_vector)
 
+        # Terminal stage throttling to prevent overshoot
         apo_error = abs(self.target_apoapsis - self.elements["apoapsis_radius"])
         peri_error = abs(self.target_periapsis - self.elements["periapsis_radius"])
+        # Find largest error
         max_error = max(apo_error, peri_error)
-        if self.target_inclination is not None:
-            h_vec = np.cross(state_vector[:3], state_vector[3:6])
-            h_norm = np.linalg.norm(h_vec)
-            if h_norm > 0:
-                inc_current = np.rad2deg(np.arccos(h_vec[2] / h_norm))
-                inc_error = abs(inc_current - self.target_inclination) * 10000.0
-                max_error = max(max_error, inc_error)
+        # Compute threshold for when to start throttling
         throttle_threshold = self.throttle_threshold_factor * max(self.apo_tolerance, self.peri_tolerance)
         if max_error < throttle_threshold:
+            # Apply proportional control to normalized error
             normalized_error = max_error / self.target_apoapsis
             self.throttle = max(self.min_throttle, self.throttle_kp * normalized_error)
 
@@ -452,21 +485,21 @@ class CircBurnGuidancePhase(GuidancePhase):
         velocity = state_vector[3:6]
         self.elements = compute_orbital_elements(position, velocity, self.mu)
 
-        # TODO: better way of doing this - currently checking for 1000km apoapsis (missed the cutoff)
-        if self.elements["apoapsis_radius"] > 6371000 + 1000000:
+        # Check for escape (missed cut-off)
+        if self.elements["apoapsis_radius"] == float("inf"):
             return True
 
-        # Eccentricity checks
+        # Eccentricity check
         ecc_ok = self.elements["eccentricity"] < self.target_eccentricity
 
         return ecc_ok
 
     def get_setpoints(self, time: float, state_vector: np.ndarray) -> Tuple[np.ndarray, float]:
+        desired_quaternion = quaternion_from_attitude_mode(state_vector, self.attitude_mode)
         if self.elements is None:
             position = state_vector[:3]
             velocity = state_vector[3:6]
             self.elements = compute_orbital_elements(position, velocity, self.mu)
-        desired_quaternion = quaternion_from_attitude_mode(state_vector, self.attitude_mode)
         if self.elements["apoapsis_radius"] == float("inf") or self.elements["periapsis_radius"] <= 0:
             # Safety: Fallback for hyperbolic or invalid orbits
             throttle = 0.0
