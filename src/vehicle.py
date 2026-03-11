@@ -218,7 +218,7 @@ class Falcon9FirstStage(Vehicle):
 
 class Falcon9SecondStage(Vehicle):
     """
-    Falcon 9 second stage. Implements single merlin vacuum engine and 8 RCS thrusters.
+    Falcon 9 second stage. Implements single merlin vacuum engine and RCS thrusters.
     """
 
     def _setup_propulsion_system(self) -> None:

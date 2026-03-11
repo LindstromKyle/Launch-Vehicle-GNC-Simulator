@@ -46,7 +46,7 @@ class Environment:
         # F = ma
         j2_perturbation = vehicle_mass * np.array([dx, dy, dz])
 
-        return newtonian_force  # + j2_perturbation
+        return newtonian_force + j2_perturbation
 
     def atmospheric_density(self, altitude: float) -> float:
         """

@@ -229,7 +229,6 @@ class PEGGuidancePhase(GuidancePhase):
         g0 = 9.80665
         thrust = self.vehicle.base_thrust_magnitude
         isp = self.vehicle.average_isp
-        dry_mass = self.vehicle.dry_mass
         prop_mass = state_vector[13]
         v_e = isp * g0
         mdot = (thrust * self.throttle) / v_e if v_e > 0 else 1e-6
