@@ -1,0 +1,982 @@
+{
+  "batch_id": "1de5930c-a95c-485f-8c4e-62814b4f4ffd",
+  "created_at": "2026-04-11T22:16:11.501262",
+  "total_simulations": 50,
+  "base_params": {
+    "delta_t_stage1": 0.1,
+    "delta_t_stage2": 0.2,
+    "log_interval": 5.0,
+    "downsample": 100,
+    "launch_latitude_deg": 28.5,
+    "stage1_dry_mass": 167100.0,
+    "stage1_initial_prop_mass": 395700.0,
+    "stage1_base_thrust_magnitude": 7600000.0,
+    "stage1_average_isp": 300.0,
+    "stage1_moment_of_inertia": [
+      480297.0,
+      480297.0,
+      725445.0
+    ],
+    "stage1_base_drag_coefficient": 0.3,
+    "stage1_drag_scaling_coefficient": 0.2,
+    "stage1_cross_sectional_area": 10.5,
+    "stage1_engine_gimbal_limit_deg": 10.0,
+    "stage1_engine_gimbal_arm_len": 20.0,
+    "stage1_dry_com_z": 15.0,
+    "stage1_prop_com_z": 20.0,
+    "stage1_pitch_start_time": 10.0,
+    "stage1_burnout_time": 155.0,
+    "stage1_initial_pitch_deg": 90.0,
+    "stage1_final_pitch_deg": 23.1,
+    "stage1_kp": [
+      6000.0,
+      6000.0,
+      9000.0
+    ],
+    "stage1_ki": [
+      0.1,
+      0.1,
+      0.15
+    ],
+    "stage1_kd": [
+      200000.0,
+      200000.0,
+      300000.0
+    ],
+    "stage2_dry_mass": 4000.0,
+    "stage2_initial_prop_mass": 111500.0,
+    "stage2_base_thrust_magnitude": 934000.0,
+    "stage2_average_isp": 348.0,
+    "stage2_moment_of_inertia": [
+      10000.0,
+      10000.0,
+      20000.0
+    ],
+    "stage2_base_drag_coefficient": 0.3,
+    "stage2_drag_scaling_coefficient": 2.0,
+    "stage2_cross_sectional_area": 7.0,
+    "stage2_engine_gimbal_limit_deg": 5.0,
+    "stage2_engine_gimbal_arm_len": 2.0,
+    "stage2_dry_com_z": 3.0,
+    "stage2_prop_com_z": 6.0,
+    "target_apo_alt_km": 300.0,
+    "target_peri_alt_km": 200.0,
+    "peg_apo_tolerance": 20000.0,
+    "peg_peri_tolerance": 20000.0,
+    "circ_target_eccentricity": 0.0011,
+    "stage2_kp": [
+      3000.0,
+      3000.0,
+      6000.0
+    ],
+    "stage2_ki": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "stage2_kd": [
+      20000.0,
+      20000.0,
+      40000.0
+    ],
+    "sim_results": "orbital_elements_only"
+  },
+  "dispersions": {
+    "stage1_base_thrust_magnitude": {
+      "mean": 7400000.0,
+      "std_dev": 200000.0
+    }
+  },
+  "simulations": [
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 258.3539833214143,
+        "apoapsis_altitude_km": 291.0109676067168,
+        "periapsis_altitude_km": 258.3470979080005,
+        "semi_major_axis_km": 6645.679032757359,
+        "eccentricity": 0.0024575268785711254,
+        "inclination": 0.4972063255859456
+      },
+      "full_data": {},
+      "simulation_index": 1,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7734300.522555442
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 274.24040840673166,
+        "apoapsis_altitude_km": 305.32485532784926,
+        "periapsis_altitude_km": 273.76341379698647,
+        "semi_major_axis_km": 6660.544134562418,
+        "eccentricity": 0.0023692840174338358,
+        "inclination": 0.4971914022575258
+      },
+      "full_data": {},
+      "simulation_index": 2,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7293540.93820171
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 268.8942991913371,
+        "apoapsis_altitude_km": 299.997147196535,
+        "periapsis_altitude_km": 268.28308313781395,
+        "semi_major_axis_km": 6655.140115167174,
+        "eccentricity": 0.0023826744072934546,
+        "inclination": 0.4972081262168484
+      },
+      "full_data": {},
+      "simulation_index": 3,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7238825.4218640765
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 250.3489627275262,
+        "apoapsis_altitude_km": 280.9972560023107,
+        "periapsis_altitude_km": 250.32867882998752,
+        "semi_major_axis_km": 6636.662967416149,
+        "eccentricity": 0.0023105420090560294,
+        "inclination": 0.4972021787515929
+      },
+      "full_data": {},
+      "simulation_index": 4,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7584713.987568793
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 256.06919093649554,
+        "apoapsis_altitude_km": 287.3650947577935,
+        "periapsis_altitude_km": 256.068874419434,
+        "semi_major_axis_km": 6642.716984588614,
+        "eccentricity": 0.0023556791905306198,
+        "inclination": 0.49720926271084626
+      },
+      "full_data": {},
+      "simulation_index": 5,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7807556.388380711
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 258.2596467278283,
+        "apoapsis_altitude_km": 289.45658266822437,
+        "periapsis_altitude_km": 257.87779296626894,
+        "semi_major_axis_km": 6644.6671878172465,
+        "eccentricity": 0.002376250669096984,
+        "inclination": 0.4972002208779659
+      },
+      "full_data": {},
+      "simulation_index": 6,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7312558.282317052
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 248.1746902536787,
+        "apoapsis_altitude_km": 280.6689740486629,
+        "periapsis_altitude_km": 248.08084775205702,
+        "semi_major_axis_km": 6635.37491090036,
+        "eccentricity": 0.002455635644873001,
+        "inclination": 0.4971987416368135
+      },
+      "full_data": {},
+      "simulation_index": 7,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7469061.743389621
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 263.62794348245114,
+        "apoapsis_altitude_km": 295.40977680620364,
+        "periapsis_altitude_km": 262.89740376351307,
+        "semi_major_axis_km": 6650.153590284858,
+        "eccentricity": 0.0024444828680489014,
+        "inclination": 0.4972234231193293
+      },
+      "full_data": {},
+      "simulation_index": 8,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7207612.645985543
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 255.9738969706334,
+        "apoapsis_altitude_km": 286.5593498593373,
+        "periapsis_altitude_km": 255.9586812983798,
+        "semi_major_axis_km": 6642.259015578858,
+        "eccentricity": 0.0023034835354347073,
+        "inclination": 0.4972041473645814
+      },
+      "full_data": {},
+      "simulation_index": 9,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7661023.977452899
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 257.27076353739017,
+        "apoapsis_altitude_km": 289.986799012986,
+        "periapsis_altitude_km": 257.04598461727335,
+        "semi_major_axis_km": 6644.516391815129,
+        "eccentricity": 0.002478796984855808,
+        "inclination": 0.49719355169399915
+      },
+      "full_data": {},
+      "simulation_index": 10,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7391052.99432043
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 270.42297582414,
+        "apoapsis_altitude_km": 301.6827803662736,
+        "periapsis_altitude_km": 270.4209863218041,
+        "semi_major_axis_km": 6657.051883344038,
+        "eccentricity": 0.002348020910178414,
+        "inclination": 0.49721097571180395
+      },
+      "full_data": {},
+      "simulation_index": 11,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7920842.501380066
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 264.35548910915946,
+        "apoapsis_altitude_km": 295.7037376783332,
+        "periapsis_altitude_km": 263.52417720478496,
+        "semi_major_axis_km": 6650.613957441559,
+        "eccentricity": 0.002419292465287534,
+        "inclination": 0.49723761657107934
+      },
+      "full_data": {},
+      "simulation_index": 12,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7177878.977188854
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 259.27606579026764,
+        "apoapsis_altitude_km": 290.02851027776205,
+        "periapsis_altitude_km": 259.10993637680264,
+        "semi_major_axis_km": 6645.569223327282,
+        "eccentricity": 0.0023262547467287993,
+        "inclination": 0.49720250937978
+      },
+      "full_data": {},
+      "simulation_index": 13,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7447302.939072711
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 263.86639735327475,
+        "apoapsis_altitude_km": 295.16511635752863,
+        "periapsis_altitude_km": 263.7965657556001,
+        "semi_major_axis_km": 6650.480841056564,
+        "eccentricity": 0.0023583671129669263,
+        "inclination": 0.49720313386022696
+      },
+      "full_data": {},
+      "simulation_index": 14,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7583774.817626135
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 258.04973339611945,
+        "apoapsis_altitude_km": 288.86399128004535,
+        "periapsis_altitude_km": 257.9350590319643,
+        "semi_major_axis_km": 6644.3995251560045,
+        "eccentricity": 0.002327443746495203,
+        "inclination": 0.49720034826802795
+      },
+      "full_data": {},
+      "simulation_index": 15,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7479686.15493918
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 267.5032535938304,
+        "apoapsis_altitude_km": 299.12869583484064,
+        "periapsis_altitude_km": 267.28680375670643,
+        "semi_major_axis_km": 6654.207749795774,
+        "eccentricity": 0.002392613311412779,
+        "inclination": 0.497202533005541
+      },
+      "full_data": {},
+      "simulation_index": 16,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7449917.249546216
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 266.43146420558355,
+        "apoapsis_altitude_km": 299.05252719780526,
+        "periapsis_altitude_km": 266.2979448629394,
+        "semi_major_axis_km": 6653.675236030372,
+        "eccentricity": 0.0024613902221658785,
+        "inclination": 0.49720352945347873
+      },
+      "full_data": {},
+      "simulation_index": 17,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7507600.695803847
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 270.5947959252568,
+        "apoapsis_altitude_km": 301.9729357195478,
+        "periapsis_altitude_km": 270.2420926300036,
+        "semi_major_axis_km": 6657.107514174776,
+        "eccentricity": 0.0023832304812548464,
+        "inclination": 0.49720146337091387
+      },
+      "full_data": {},
+      "simulation_index": 18,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7378475.837030895
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 250.25414463860355,
+        "apoapsis_altitude_km": 282.3745312343864,
+        "periapsis_altitude_km": 250.06979813410064,
+        "semi_major_axis_km": 6637.222164684244,
+        "eccentricity": 0.0024336034186240316,
+        "inclination": 0.49719466951615715
+      },
+      "full_data": {},
+      "simulation_index": 19,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7388952.800233725
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 252.44024103133566,
+        "apoapsis_altitude_km": 285.7129184456598,
+        "periapsis_altitude_km": 252.43913705090526,
+        "semi_major_axis_km": 6640.076027748283,
+        "eccentricity": 0.0025055271397274675,
+        "inclination": 0.4972081600256283
+      },
+      "full_data": {},
+      "simulation_index": 20,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7782443.1103690155
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 272.66236724024265,
+        "apoapsis_altitude_km": 304.6185557158198,
+        "periapsis_altitude_km": 272.52227705801465,
+        "semi_major_axis_km": 6659.570416386917,
+        "eccentricity": 0.002409785965985788,
+        "inclination": 0.497204179319998
+      },
+      "full_data": {},
+      "simulation_index": 21,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7548937.669411525
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 267.93143727955686,
+        "apoapsis_altitude_km": 298.37258585564234,
+        "periapsis_altitude_km": 266.891524874242,
+        "semi_major_axis_km": 6653.632055364942,
+        "eccentricity": 0.0023657049803360243,
+        "inclination": 0.49724206363493534
+      },
+      "full_data": {},
+      "simulation_index": 22,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7068963.431285607
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 271.7085221355539,
+        "apoapsis_altitude_km": 303.0454857397694,
+        "periapsis_altitude_km": 271.5677090951409,
+        "semi_major_axis_km": 6658.306597417455,
+        "eccentricity": 0.002363797474934414,
+        "inclination": 0.49720401172255946
+      },
+      "full_data": {},
+      "simulation_index": 23,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7532485.364149032
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 277.9079294171035,
+        "apoapsis_altitude_km": 306.90884661801346,
+        "periapsis_altitude_km": 276.79887707605957,
+        "semi_major_axis_km": 6662.853861847037,
+        "eccentricity": 0.0022595399933931426,
+        "inclination": 0.4972462215775254
+      },
+      "full_data": {},
+      "simulation_index": 24,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7006746.829693746
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 247.35346388996393,
+        "apoapsis_altitude_km": 279.865175799435,
+        "periapsis_altitude_km": 247.29956206528936,
+        "semi_major_axis_km": 6634.582368932362,
+        "eccentricity": 0.00245423237841169,
+        "inclination": 0.49720146025567696
+      },
+      "full_data": {},
+      "simulation_index": 25,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7493533.015796092
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 250.17289743138292,
+        "apoapsis_altitude_km": 280.6929176707398,
+        "periapsis_altitude_km": 250.1549730495233,
+        "semi_major_axis_km": 6636.423945360131,
+        "eccentricity": 0.0023007831380759325,
+        "inclination": 0.4972022655895389
+      },
+      "full_data": {},
+      "simulation_index": 26,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7590075.772545309
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 263.32780917618237,
+        "apoapsis_altitude_km": 293.75366375943923,
+        "periapsis_altitude_km": 262.96202695571446,
+        "semi_major_axis_km": 6649.3578453575765,
+        "eccentricity": 0.0023153842461060372,
+        "inclination": 0.49720358284741767
+      },
+      "full_data": {},
+      "simulation_index": 27,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7336981.030215475
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 265.0082004068149,
+        "apoapsis_altitude_km": 295.22158918870053,
+        "periapsis_altitude_km": 264.82766800986417,
+        "semi_major_axis_km": 6651.024628599283,
+        "eccentricity": 0.002284905174470696,
+        "inclination": 0.4971982697498977
+      },
+      "full_data": {},
+      "simulation_index": 28,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7456943.209898609
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 250.36580558529963,
+        "apoapsis_altitude_km": 282.36983710329605,
+        "periapsis_altitude_km": 250.17161088004244,
+        "semi_major_axis_km": 6637.270723991669,
+        "eccentricity": 0.0024255622199397687,
+        "inclination": 0.4971941707879493
+      },
+      "full_data": {},
+      "simulation_index": 29,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7381027.798565215
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 265.1756523580719,
+        "apoapsis_altitude_km": 297.54915233967637,
+        "periapsis_altitude_km": 265.1574633220099,
+        "semi_major_axis_km": 6652.353307830843,
+        "eccentricity": 0.002434603779953904,
+        "inclination": 0.49720690541745516
+      },
+      "full_data": {},
+      "simulation_index": 30,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7756569.949116563
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 267.7778774007093,
+        "apoapsis_altitude_km": 300.00326065615286,
+        "periapsis_altitude_km": 267.3101381908916,
+        "semi_major_axis_km": 6654.656699423522,
+        "eccentricity": 0.002456409394348802,
+        "inclination": 0.49719576520336833
+      },
+      "full_data": {},
+      "simulation_index": 31,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7299865.893882664
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 270.4768637571763,
+        "apoapsis_altitude_km": 302.76951343111506,
+        "periapsis_altitude_km": 269.7682172849663,
+        "semi_major_axis_km": 6657.268865358041,
+        "eccentricity": 0.002478591207114656,
+        "inclination": 0.4972257862862606
+      },
+      "full_data": {},
+      "simulation_index": 32,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7254673.794285025
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 268.0878176015038,
+        "apoapsis_altitude_km": 299.00908621624114,
+        "periapsis_altitude_km": 267.43485727536864,
+        "semi_major_axis_km": 6654.221971745805,
+        "eccentricity": 0.002372495918751889,
+        "inclination": 0.49722560871010746
+      },
+      "full_data": {},
+      "simulation_index": 33,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7253730.027431107
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 259.6132167898761,
+        "apoapsis_altitude_km": 291.39908458650393,
+        "periapsis_altitude_km": 259.4671661783727,
+        "semi_major_axis_km": 6646.433125382438,
+        "eccentricity": 0.0024021845857581286,
+        "inclination": 0.49719852194178016
+      },
+      "full_data": {},
+      "simulation_index": 34,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7472204.622524323
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 261.4238075666856,
+        "apoapsis_altitude_km": 291.1206862633582,
+        "periapsis_altitude_km": 260.69182779691744,
+        "semi_major_axis_km": 6646.906257030138,
+        "eccentricity": 0.0022889489703767445,
+        "inclination": 0.49723375168589173
+      },
+      "full_data": {},
+      "simulation_index": 35,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7184202.593564556
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 269.5700243619075,
+        "apoapsis_altitude_km": 300.5745198504906,
+        "periapsis_altitude_km": 268.11949595752077,
+        "semi_major_axis_km": 6655.347007904005,
+        "eccentricity": 0.0024382668442700785,
+        "inclination": 0.497268951489945
+      },
+      "full_data": {},
+      "simulation_index": 36,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 6888100.333447292
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 264.18211108285186,
+        "apoapsis_altitude_km": 295.616554099502,
+        "periapsis_altitude_km": 264.10182553466313,
+        "semi_major_axis_km": 6650.859189817083,
+        "eccentricity": 0.0023692223564956327,
+        "inclination": 0.4972030418862938
+      },
+      "full_data": {},
+      "simulation_index": 37,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7567635.362694433
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 253.37523135396,
+        "apoapsis_altitude_km": 285.25420987607816,
+        "periapsis_altitude_km": 252.41373026279547,
+        "semi_major_axis_km": 6639.833970069436,
+        "eccentricity": 0.0024729895176082315,
+        "inclination": 0.4972186489150573
+      },
+      "full_data": {},
+      "simulation_index": 38,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7087610.680194408
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 261.0907140098885,
+        "apoapsis_altitude_km": 292.14452134020814,
+        "periapsis_altitude_km": 260.5234876027079,
+        "semi_major_axis_km": 6647.334004471458,
+        "eccentricity": 0.0023784748679868614,
+        "inclination": 0.4972073620759508
+      },
+      "full_data": {},
+      "simulation_index": 39,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7236870.774192499
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 273.81965441331266,
+        "apoapsis_altitude_km": 305.7920464136787,
+        "periapsis_altitude_km": 273.6248719829749,
+        "semi_major_axis_km": 6660.708459198327,
+        "eccentricity": 0.0024146961714171028,
+        "inclination": 0.4972020620749565
+      },
+      "full_data": {},
+      "simulation_index": 40,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7492959.721586315
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 252.13533199644274,
+        "apoapsis_altitude_km": 284.2607871933235,
+        "periapsis_altitude_km": 252.07749357084558,
+        "semi_major_axis_km": 6639.169140382085,
+        "eccentricity": 0.0024237440666126675,
+        "inclination": 0.4972015769014573
+      },
+      "full_data": {},
+      "simulation_index": 41,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7514112.154386248
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 272.5229562912006,
+        "apoapsis_altitude_km": 303.75955962047635,
+        "periapsis_altitude_km": 272.3453747069435,
+        "semi_major_axis_km": 6659.0524671637095,
+        "eccentricity": 0.0023587578764725746,
+        "inclination": 0.49720254819857096
+      },
+      "full_data": {},
+      "simulation_index": 42,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7492357.732947456
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 263.99365674126426,
+        "apoapsis_altitude_km": 295.281119731619,
+        "periapsis_altitude_km": 263.93265573274994,
+        "semi_major_axis_km": 6650.606887732184,
+        "eccentricity": 0.00235681228255238,
+        "inclination": 0.4972037444557665
+      },
+      "full_data": {},
+      "simulation_index": 43,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7618941.284502411
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 264.46191649849715,
+        "apoapsis_altitude_km": 296.8452093603574,
+        "periapsis_altitude_km": 264.46191272123065,
+        "semi_major_axis_km": 6651.653561040795,
+        "eccentricity": 0.002434229048608235,
+        "inclination": 0.49721100742935875
+      },
+      "full_data": {},
+      "simulation_index": 44,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7890939.563688893
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 253.02999204586538,
+        "apoapsis_altitude_km": 284.8980950746276,
+        "periapsis_altitude_km": 252.64371062868275,
+        "semi_major_axis_km": 6639.770902851656,
+        "eccentricity": 0.0024288778120410996,
+        "inclination": 0.49719672789691566
+      },
+      "full_data": {},
+      "simulation_index": 45,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7295955.832528608
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 263.1600972629767,
+        "apoapsis_altitude_km": 293.899204574517,
+        "periapsis_altitude_km": 262.79891368596907,
+        "semi_major_axis_km": 6649.349059130243,
+        "eccentricity": 0.002338596651490568,
+        "inclination": 0.4972067258693405
+      },
+      "full_data": {},
+      "simulation_index": 46,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7352656.375136008
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 263.32562597798744,
+        "apoapsis_altitude_km": 295.7887760102423,
+        "periapsis_altitude_km": 263.068573829866,
+        "semi_major_axis_km": 6650.428674920054,
+        "eccentricity": 0.00246000699953145,
+        "inclination": 0.4971985673101513
+      },
+      "full_data": {},
+      "simulation_index": 47,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7408613.540969422
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 251.98960911147483,
+        "apoapsis_altitude_km": 284.0361076635523,
+        "periapsis_altitude_km": 251.9378523444943,
+        "semi_major_axis_km": 6638.986980004024,
+        "eccentricity": 0.0024174061054596948,
+        "inclination": 0.4972016647720577
+      },
+      "full_data": {},
+      "simulation_index": 48,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7524562.565321404
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 246.60725811725763,
+        "apoapsis_altitude_km": 279.7720730251037,
+        "periapsis_altitude_km": 246.6070848736614,
+        "semi_major_axis_km": 6634.189578949383,
+        "eccentricity": 0.0024995508310974852,
+        "inclination": 0.4972060613180197
+      },
+      "full_data": {},
+      "simulation_index": 49,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7693133.672115282
+      }
+    },
+    {
+      "message": "Simulation completed successfully",
+      "summary": {
+        "total_duration_s": 5655.0,
+        "final_altitude_km": 264.439353156982,
+        "apoapsis_altitude_km": 295.27702596257535,
+        "periapsis_altitude_km": 264.3156048642574,
+        "semi_major_axis_km": 6650.796315413417,
+        "eccentricity": 0.0023276476702920232,
+        "inclination": 0.4972042325562441
+      },
+      "full_data": {},
+      "simulation_index": 50,
+      "dispersions_applied": {
+        "stage1_base_thrust_magnitude": 7489843.197375151
+      }
+    }
+  ],
+  "status": "completed",
+  "summary": {
+    "total_simulations": 50,
+    "completed_simulations": 50,
+    "failed_simulations": 0,
+    "success_rate": 1.0,
+    "final_altitude_km": {
+      "mean": 261.82211093762106,
+      "std": 7.974327666161106,
+      "min": 246.60725811725763,
+      "max": 277.9079294171035,
+      "percentile_5": 249.0738834836456,
+      "percentile_95": 273.29887518543114
+    },
+    "apoapsis_altitude_km": {
+      "mean": 293.32723596838116,
+      "std": 7.712140206431074,
+      "min": 279.7720730251037,
+      "max": 306.90884661801346,
+      "percentile_5": 280.6797486785975,
+      "percentile_95": 305.00702050243603
+    },
+    "periapsis_altitude_km": {
+      "mean": 261.51545694054215,
+      "std": 7.8469257093383735,
+      "min": 246.6070848736614,
+      "max": 276.79887707605957,
+      "percentile_5": 248.97587542397665,
+      "percentile_95": 273.1287042667428
+    },
+    "eccentricity": {
+      "mean": 0.002392446165798601,
+      "std": 6.031399474477598e-05,
+      "min": 0.0022595399933931426,
+      "max": 0.0025055271397274675,
+      "percentile_5": 0.002294274345841379,
+      "percentile_95": 0.00247870438487229
+    },
+    "failure_modes": []
+  }
+}
