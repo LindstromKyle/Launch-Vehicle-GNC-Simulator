@@ -46,7 +46,9 @@ stage2_prop_com_z = 6.0
 separation_time = burnout_time
 
 # Combined vehicle for ascent
-combined_dry_mass = stage1_dry_mass + stage1_reserve_prop + stage2_dry_mass + stage2_prop
+combined_dry_mass = (
+    stage1_dry_mass + stage1_reserve_prop + stage2_dry_mass + stage2_prop
+)
 
 # Vehicle
 stage_1 = Falcon9FirstStage(
@@ -84,10 +86,14 @@ omega_cross_r = np.cross(environment.earth_angular_velocity_vector, initial_posi
 radial_unit_vector = initial_position / np.linalg.norm(initial_position)
 initial_quaternion = compute_body_z_to_inertial_quat(radial_unit_vector)
 # Initial kick east during pitch program
-kick_direction = rotate_body_to_inertial_by_quat(np.array([0, 1, 0]), initial_quaternion)
+kick_direction = rotate_body_to_inertial_by_quat(
+    np.array([0, 1, 0]), initial_quaternion
+)
 
 # Find orbital normal
-horizontal_projection = kick_direction - np.dot(kick_direction, radial_unit_vector) * radial_unit_vector
+horizontal_projection = (
+    kick_direction - np.dot(kick_direction, radial_unit_vector) * radial_unit_vector
+)
 horizontal_unit = horizontal_projection / np.linalg.norm(horizontal_projection)
 orbital_normal = np.cross(radial_unit_vector, horizontal_unit)
 orbital_normal /= np.linalg.norm(orbital_normal)
@@ -106,7 +112,12 @@ pitch_start_time = 10.0
 
 # Phases
 stage1_phases = [
-    TimeBasedGuidancePhase(end_time=pitch_start_time, attitude_mode="radial", throttle=1.0, name="Initial Ascent"),
+    TimeBasedGuidancePhase(
+        end_time=pitch_start_time,
+        attitude_mode="radial",
+        throttle=1.0,
+        name="Initial Ascent",
+    ),
     ProgrammedPitchGuidancePhase(
         start_time=pitch_start_time,
         end_time=burnout_time,
@@ -121,7 +132,10 @@ stage1_phases = [
 
 # Mission Planner
 stage1_planner = MissionPlanner(
-    guidance_phases=stage1_phases, environment=environment, vehicle=stage_1, start_time=0.0
+    guidance_phases=stage1_phases,
+    environment=environment,
+    vehicle=stage_1,
+    start_time=0.0,
 )
 
 # Controller gains
@@ -191,7 +205,9 @@ target_periapsis = target_peri_alt + environment.earth_radius
 simulation_end_time = separation_time + 5500
 burnout_quaternion = burnout_state_vector[6:10]
 burnout_position = burnout_state_vector[:3]
-burnout_z_unit_vector = rotate_body_to_inertial_by_quat(np.array([0, 0, 1]), burnout_quaternion)
+burnout_z_unit_vector = rotate_body_to_inertial_by_quat(
+    np.array([0, 0, 1]), burnout_quaternion
+)
 burnout_radial_unit_vector = burnout_position / np.linalg.norm(burnout_position)
 burnout_dot = np.dot(burnout_z_unit_vector, burnout_radial_unit_vector)
 burnout_pitch = np.rad2deg(np.pi / 2 - np.arccos(np.clip(burnout_dot, -1.0, 1.0)))
@@ -230,11 +246,19 @@ stage2_phases = [
         throttle_kp=20.0,
         target_eccentricity=0.0011,
     ),
-    TimeBasedGuidancePhase(end_time=simulation_end_time, attitude_mode="passive", throttle=0.0, name="Orbit"),
+    TimeBasedGuidancePhase(
+        end_time=simulation_end_time,
+        attitude_mode="passive",
+        throttle=0.0,
+        name="Orbit",
+    ),
 ]
 
 stage2_planner = MissionPlanner(
-    guidance_phases=stage2_phases, environment=environment, vehicle=stage_2, start_time=separation_time
+    guidance_phases=stage2_phases,
+    environment=environment,
+    vehicle=stage_2,
+    start_time=separation_time,
 )
 
 stage2_p = 3e3
@@ -256,7 +280,7 @@ sim_stage2 = Simulator(
     t_0=separation_time,
     t_final=simulation_end_time,  # Enough for orbit
     delta_t=0.2,
-    log_interval=0.5,
+    log_interval=5,
     log_name="orbit",
 )
 sim_stage2.add_controller(controller_stage2)

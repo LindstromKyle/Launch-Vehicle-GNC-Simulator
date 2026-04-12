@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 import numpy as np
 
 from environment import Environment
@@ -68,9 +69,15 @@ class Simulator:
             - Array of state vectors at each time point
             - List of (time, phase_name) tuples marking phase transitions
         """
+
+        # Ensure the logs directory exists (creates it if missing, including any parent folders)
+        log_dir = Path(__file__).parent.parent / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        logfile = log_dir / f"{self.log_name}.log"
+        
         # Set up logging
-        logging.basicConfig(
-            filename=f"../logs/{self.log_name}.log",
+        logging.basicConfig( 
+            filename=logfile,
             level=logging.INFO,
             format="[%(levelname)s] %(message)s",
             filemode="w",
