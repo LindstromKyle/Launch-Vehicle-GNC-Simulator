@@ -133,28 +133,27 @@ class MonteCarloRequest(BaseModel):
         return self.num_simulations
 
 
-class MonteCarloResult(BaseModel):
+class MonteCarloBatchResponse(BaseModel):
     """
-    Result summary from a Monte Carlo analysis batch.
+    Results summary from a Monte Carlo analysis batch.
     """
 
     batch_id: str
+    created_at: str
+    status: str
     total_simulations: int
     completed_simulations: int
     failed_simulations: int
     success_rate: float
     statistics: Dict[str, Any]
-    created_at: str
 
 
-class MonteCarloRunStatus(BaseModel):
+class MonteCarloKickoffResponse(BaseModel):
     """
-    Status of an ongoing or completed Monte Carlo batch.
+    Confirmation response for a Monte Carlo batch that has just been started.
     """
 
     batch_id: str
     created_at: str
-    status: str  # "in_progress", "completed", or "failed"
+    status: str
     total_simulations: int
-    completed_simulations: int
-    summary: Optional[Dict[str, Any]] = None

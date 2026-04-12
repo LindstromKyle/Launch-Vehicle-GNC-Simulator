@@ -9,8 +9,8 @@ from app.models.simulation_models import (
     SimulationRequest,
     SimulationResponse,
     MonteCarloRequest,
-    MonteCarloResult,
-    MonteCarloRunStatus,
+    MonteCarloBatchResponse,
+    MonteCarloKickoffResponse,
 )
 from app.utils.simulation_runner import run_full_orbit_simulation
 from app.utils.monte_carlo_runner import MonteCarloRunner
@@ -39,7 +39,7 @@ async def simulate(request: SimulationRequest):
         raise HTTPException(status_code=500, detail=error_detail)
 
 
-@sim_router.post("/monte-carlo", response_model=MonteCarloRunStatus)
+@sim_router.post("/monte-carlo", response_model=MonteCarloKickoffResponse)
 async def run_monte_carlo(request: MonteCarloRequest):
     """
     Initiate a Monte Carlo dispersion analysis.
@@ -74,13 +74,11 @@ async def run_monte_carlo(request: MonteCarloRequest):
 
         # Return immediately with batch_id and in_progress status
         batch_status = mc_storage.get_batch(batch_id)
-        return MonteCarloRunStatus(
+        return MonteCarloKickoffResponse(
             batch_id=batch_status["batch_id"],
             created_at=batch_status["created_at"],
             status=batch_status["status"],
             total_simulations=batch_status["total_simulations"],
-            completed_simulations=len(batch_status["simulations"]),
-            summary=batch_status["summary"],
         )
 
     except Exception as e:
@@ -128,7 +126,7 @@ def _run_monte_carlo_background(batch_id: str, request: MonteCarloRequest):
         mc_storage._save_batch(batch_id, batch_data)
 
 
-@sim_router.get("/monte-carlo/{batch_id}", response_model=MonteCarloResult)
+@sim_router.get("/monte-carlo/{batch_id}", response_model=MonteCarloBatchResponse)
 async def get_monte_carlo_result(batch_id: str):
     """Retrieve results from a Monte Carlo batch."""
     try:
@@ -151,8 +149,10 @@ async def get_monte_carlo_result(batch_id: str):
         completed_simulations = len(batch_data["simulations"])
         total_simulations = batch_data["total_simulations"]
 
-        return MonteCarloResult(
+        return MonteCarloBatchResponse(
             batch_id=batch_data["batch_id"],
+            created_at=batch_data["created_at"],
+            status=batch_data["status"],
             total_simulations=total_simulations,
             completed_simulations=completed_simulations,
             failed_simulations=total_simulations - completed_simulations,
@@ -162,7 +162,6 @@ async def get_monte_carlo_result(batch_id: str):
                 else 0.0
             ),
             statistics=batch_data["summary"],
-            created_at=batch_data["created_at"],
         )
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Batch {batch_id} not found")
