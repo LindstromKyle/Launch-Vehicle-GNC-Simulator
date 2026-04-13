@@ -1,23 +1,25 @@
-from fastapi import APIRouter, HTTPException
-import traceback
 import asyncio
+import traceback
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
-from typing import Any, Dict
+
+from fastapi import APIRouter, HTTPException
 
 from app.models.simulation_models import (
-    SimulationRequest,
-    SimulationResponse,
-    MonteCarloRequest,
     MonteCarloBatchResponse,
     MonteCarloKickoffResponse,
+    MonteCarloRequest,
+    SimulationRequest,
+    SimulationResponse,
 )
-from app.utils.simulation_runner import run_full_orbit_simulation
+from app.settings import get_settings
 from app.utils.monte_carlo_runner import MonteCarloRunner
 from app.utils.monte_carlo_storage import MonteCarloStorage
+from app.utils.simulation_runner import run_full_orbit_simulation
+
+settings = get_settings()
 
 # Simulation takes a while to run, so use a thread pool
-executor = ThreadPoolExecutor(max_workers=4)
+executor = ThreadPoolExecutor(max_workers=settings.simulator_executor_max_workers)
 
 # Initialize Monte Carlo storage and service
 mc_storage = MonteCarloStorage()

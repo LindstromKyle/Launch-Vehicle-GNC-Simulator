@@ -3,10 +3,12 @@ Simple JSON-based storage for Monte Carlo simulation results.
 """
 
 import json
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
-import uuid
+
+from app.settings import get_settings
 
 
 class MonteCarloStorage:
@@ -20,7 +22,10 @@ class MonteCarloStorage:
             storage_dir: Directory to store MC results. Defaults to ./mc_results/
         """
         if storage_dir is None:
-            storage_dir = Path(__file__).parent.parent.parent / "mc_results"
+            settings = get_settings()
+            storage_dir = settings.monte_carlo_storage_dir or (
+                Path(__file__).parent.parent.parent / "mc_results"
+            )
 
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)

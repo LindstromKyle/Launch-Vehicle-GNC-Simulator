@@ -79,10 +79,76 @@ This project is a modular, physics-based 6-DoF rocket ascent simulator that mode
 
 ![Logs](readme_imgs/logs.png)
 
+
+
+## API and Operations
+
+The simulator now includes a FastAPI service and Monte Carlo batch endpoints.
+
+### Local API Run
+
+1. Install dependencies:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+2. Start the API from the project root:
+
+```bash
+uvicorn app.main:app --app-dir src --host 0.0.0.0 --port 8000
+```
+
+3. Confirm health:
+
+```bash
+curl http://localhost:8000/health
+```
+
+### Environment Variables
+
+Create a `.env` file (or set variables directly) to customize runtime behavior:
+
+- `SIM_API_TITLE` (default: `6DOF Launch Simulator`)
+- `SIM_API_DESCRIPTION` (default: API description string)
+- `SIM_ENVIRONMENT` (default: `dev`)
+- `SIM_DEBUG` (default: `false`)
+- `SIM_EXECUTOR_MAX_WORKERS` (default: `4`)
+- `SIM_MONTE_CARLO_STORAGE_DIR` (default: `src/mc_results`)
+
+### Docker
+
+Build and run with Docker:
+
+```bash
+docker build -t launch-gnc-sim .
+docker run --rm -p 8000:8000 --env-file .env launch-gnc-sim
+```
+
+Or use compose:
+
+```bash
+docker compose up --build
+```
+
+### Tests and CI
+
+Run tests locally:
+
+```bash
+PYTHONPATH=src pytest
+```
+
+GitHub Actions now validates:
+
+- Linting via Ruff
+- Formatting via Black
+- Unit tests via Pytest
+- Docker image build health
+
+
 ## Future Extensions
 
-
-- Monte Carlo framework for dispersion analysis  
 - Boost-back, re-entry, and landing burns with added control surfaces
 - C++/Rust performance port of dynamics & integration core  
 - Hardware-in-the-loop (HIL) interface layer  

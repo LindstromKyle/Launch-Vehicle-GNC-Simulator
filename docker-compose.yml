@@ -1,0 +1,15 @@
+services:
+  simulator-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: launch-vehicle-gnc-simulator:latest
+    env_file:
+      - .env
+    environment:
+      SIM_ENVIRONMENT: docker
+      SIM_MONTE_CARLO_STORAGE_DIR: /workdir/src/mc_results
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src/mc_results:/workdir/src/mc_results

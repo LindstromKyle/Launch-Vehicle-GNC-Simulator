@@ -1,20 +1,24 @@
 import numpy as np
 
 from app.models.simulation_models import SimResults, SimulationRequest
-from state import State
-from simulator import Simulator
-from mission import MissionPlanner
 from controller import PIDAttitudeController
-from vehicle import Falcon9FirstStage, Falcon9SecondStage
 from environment import Environment
 from guidance import (
-    TimeBasedGuidancePhase,
-    ProgrammedPitchGuidancePhase,
-    PEGGuidancePhase,
-    CoastGuidancePhase,
     CircBurnGuidancePhase,
+    CoastGuidancePhase,
+    PEGGuidancePhase,
+    ProgrammedPitchGuidancePhase,
+    TimeBasedGuidancePhase,
 )
-from utils import compute_body_z_to_inertial_quat, compute_orbital_elements, rotate_body_to_inertial_by_quat
+from mission import MissionPlanner
+from simulator import Simulator
+from state import State
+from utils import (
+    compute_body_z_to_inertial_quat,
+    compute_orbital_elements,
+    rotate_body_to_inertial_by_quat,
+)
+from vehicle import Falcon9FirstStage, Falcon9SecondStage
 
 
 def run_full_orbit_simulation(request: SimulationRequest) -> dict:
@@ -23,7 +27,7 @@ def run_full_orbit_simulation(request: SimulationRequest) -> dict:
 
     Args:
         request: The SimulationRequest model
-    
+
     Returns:
         Dictionary with final sim results
     """
@@ -35,7 +39,7 @@ def run_full_orbit_simulation(request: SimulationRequest) -> dict:
     stage1_inertia = np.diag(request.stage1_moment_of_inertia)
 
     stage1 = Falcon9FirstStage(
-        dry_mass=request.stage1_dry_mass,          # now 167100
+        dry_mass=request.stage1_dry_mass,  # now 167100
         initial_prop_mass=request.stage1_initial_prop_mass,
         base_thrust_magnitude=request.stage1_base_thrust_magnitude,
         average_isp=request.stage1_average_isp,
@@ -51,14 +55,18 @@ def run_full_orbit_simulation(request: SimulationRequest) -> dict:
 
     # Launch site & initial state
     lat_rad = np.deg2rad(request.launch_latitude_deg)
-    initial_position = env.earth_radius * np.array([np.cos(lat_rad), 0.0, np.sin(lat_rad)])
+    initial_position = env.earth_radius * np.array(
+        [np.cos(lat_rad), 0.0, np.sin(lat_rad)]
+    )
     omega_cross_r = np.cross(env.earth_angular_velocity_vector, initial_position)
     radial_unit = initial_position / np.linalg.norm(initial_position)
     initial_quat = compute_body_z_to_inertial_quat(radial_unit)
 
     kick_dir_body = np.array([0, 1, 0])
     kick_dir_inertial = rotate_body_to_inertial_by_quat(kick_dir_body, initial_quat)
-    horizontal = kick_dir_inertial - np.dot(kick_dir_inertial, radial_unit) * radial_unit
+    horizontal = (
+        kick_dir_inertial - np.dot(kick_dir_inertial, radial_unit) * radial_unit
+    )
     horizontal /= np.linalg.norm(horizontal)
     orbital_normal = np.cross(radial_unit, horizontal)
     orbital_normal /= np.linalg.norm(orbital_normal)
@@ -73,7 +81,12 @@ def run_full_orbit_simulation(request: SimulationRequest) -> dict:
 
     # Stage 1 phases
     stage1_phases = [
-        TimeBasedGuidancePhase(end_time=request.stage1_pitch_start_time, attitude_mode="radial", throttle=1.0, name="Initial Ascent"),
+        TimeBasedGuidancePhase(
+            end_time=request.stage1_pitch_start_time,
+            attitude_mode="radial",
+            throttle=1.0,
+            name="Initial Ascent",
+        ),
         ProgrammedPitchGuidancePhase(
             start_time=request.stage1_pitch_start_time,
             end_time=request.stage1_burnout_time,
@@ -96,9 +109,15 @@ def run_full_orbit_simulation(request: SimulationRequest) -> dict:
     )
 
     sim1 = Simulator(
-        vehicle=stage1, environment=env, initial_state=initial_state,
-        mission_planner=stage1_planner, t_0=0, t_final=request.stage1_burnout_time,
-        delta_t=request.delta_t_stage1, log_interval=request.log_interval, log_name="api_stage1",
+        vehicle=stage1,
+        environment=env,
+        initial_state=initial_state,
+        mission_planner=stage1_planner,
+        t_0=0,
+        t_final=request.stage1_burnout_time,
+        delta_t=request.delta_t_stage1,
+        log_interval=request.log_interval,
+        log_name="api_stage1",
     )
     sim1.add_controller(controller1)
     stage1_t, stage1_state, stage1_trans = sim1.run()
@@ -106,8 +125,10 @@ def run_full_orbit_simulation(request: SimulationRequest) -> dict:
     # ==================== STAGE 2 ====================
     burnout_vec = stage1_state[-1]
     stage2_state = State(
-        position=burnout_vec[:3], velocity=burnout_vec[3:6],
-        quaternion=burnout_vec[6:10], angular_velocity=burnout_vec[10:13],
+        position=burnout_vec[:3],
+        velocity=burnout_vec[3:6],
+        quaternion=burnout_vec[6:10],
+        angular_velocity=burnout_vec[10:13],
         propellant_mass=request.stage2_initial_prop_mass,
     )
 
@@ -174,7 +195,9 @@ def run_full_orbit_simulation(request: SimulationRequest) -> dict:
         ),
     ]
 
-    stage2_planner = MissionPlanner(stage2_phases, env, stage2, start_time=request.stage1_burnout_time)
+    stage2_planner = MissionPlanner(
+        stage2_phases, env, stage2, start_time=request.stage1_burnout_time
+    )
 
     controller2 = PIDAttitudeController(
         kp=np.array(request.stage2_kp),
@@ -184,10 +207,15 @@ def run_full_orbit_simulation(request: SimulationRequest) -> dict:
     )
 
     sim2 = Simulator(
-        vehicle=stage2, environment=env, initial_state=stage2_state,
-        mission_planner=stage2_planner, t_0=request.stage1_burnout_time,
-        t_final=sim_end_time, delta_t=request.delta_t_stage2,
-        log_interval=request.log_interval, log_name="api_stage2",
+        vehicle=stage2,
+        environment=env,
+        initial_state=stage2_state,
+        mission_planner=stage2_planner,
+        t_0=request.stage1_burnout_time,
+        t_final=sim_end_time,
+        delta_t=request.delta_t_stage2,
+        log_interval=request.log_interval,
+        log_name="api_stage2",
     )
     sim2.add_controller(controller2)
     stage2_t, stage2_state, stage2_trans = sim2.run()
@@ -195,7 +223,9 @@ def run_full_orbit_simulation(request: SimulationRequest) -> dict:
     # Combine results (your existing logic)
     all_t = np.append(stage1_t, stage2_t)
     all_state = np.vstack((stage1_state, stage2_state))
-    all_trans = [(float(t), name) for t, name in stage1_trans] + [(float(t), name) for t, name in stage2_trans]
+    all_trans = [(float(t), name) for t, name in stage1_trans] + [
+        (float(t), name) for t, name in stage2_trans
+    ]
 
     ds = request.downsample
     full_data = {}
@@ -211,19 +241,28 @@ def run_full_orbit_simulation(request: SimulationRequest) -> dict:
     orbital_elements = compute_orbital_elements(
         position=stage2_state[-1, :3],
         velocity=stage2_state[-1, 3:6],
-        gravitational_parameter=mu
+        gravitational_parameter=mu,
     )
 
     return {
         "message": "Simulation completed successfully",
         "summary": {
             "total_duration_s": float(stage2_t[-1]),
-            "final_altitude_km": float(np.linalg.norm(stage2_state[-1, :3]) - env.earth_radius) / 1000,
-            "apoapsis_altitude_km": float(orbital_elements["apoapsis_radius"] - env.earth_radius) / 1000,
-            "periapsis_altitude_km": float(orbital_elements["periapsis_radius"] - env.earth_radius) / 1000,
+            "final_altitude_km": float(
+                np.linalg.norm(stage2_state[-1, :3]) - env.earth_radius
+            )
+            / 1000,
+            "apoapsis_altitude_km": float(
+                orbital_elements["apoapsis_radius"] - env.earth_radius
+            )
+            / 1000,
+            "periapsis_altitude_km": float(
+                orbital_elements["periapsis_radius"] - env.earth_radius
+            )
+            / 1000,
             "semi_major_axis_km": float(orbital_elements["semi_major_axis"]) / 1000,
             "eccentricity": float(orbital_elements["eccentricity"]),
             "inclination": float(orbital_elements["inclination"]),
         },
-        "full_data": full_data
+        "full_data": full_data,
     }

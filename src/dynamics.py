@@ -1,16 +1,22 @@
-import numpy as np
 import logging
 import warnings
 
+import numpy as np
+
 from environment import Environment
-from vehicle import Vehicle
 from utils import compute_quaternion_derivative
+from vehicle import Vehicle
 
 warnings.filterwarnings("error", category=RuntimeWarning)
 
 
 def calculate_dynamics(
-    state: np.ndarray, vehicle: Vehicle, environment: Environment, throttle: float, controls: dict, log_flag: bool
+    state: np.ndarray,
+    vehicle: Vehicle,
+    environment: Environment,
+    throttle: float,
+    controls: dict,
+    log_flag: bool,
 ) -> np.ndarray:
     """
     Calculates linear and angular state derivatives, as well as mass flow rate.
@@ -65,11 +71,18 @@ def calculate_dynamics(
 
     # Angular dynamics
     moment_of_inertia = vehicle.moment_of_inertia
-    aerodynamic_torque = environment.aerodynamic_torque(position, velocity, quaternion, angular_velocity, vehicle)
+    aerodynamic_torque = environment.aerodynamic_torque(
+        position, velocity, quaternion, angular_velocity, vehicle
+    )
     # Gyroscopic reaction
     angular_momentum = moment_of_inertia @ angular_velocity
     gyroscopic_reaction_torque = np.cross(angular_velocity, angular_momentum)
-    total_torque = thrust_vector_torque + aerodynamic_torque + rcs_torque - gyroscopic_reaction_torque
+    total_torque = (
+        thrust_vector_torque
+        + aerodynamic_torque
+        + rcs_torque
+        - gyroscopic_reaction_torque
+    )
     angular_acceleration = np.linalg.inv(moment_of_inertia) @ total_torque
 
     # Log state evolution
@@ -91,7 +104,9 @@ def calculate_dynamics(
                 logging.info(
                     f"gimbal angle 1 (deg): {np.round(np.rad2deg(gimbal_angles[0]), 8)} | gimbal angle 1 (deg): {np.round(np.rad2deg(gimbal_angles[0]), 8)} | gimbal angle 1 (deg): {np.round(np.rad2deg(gimbal_angles[0]), 8)}"
                 )
-        logging.info(f"------------------------------------[DYNAMICS]--------------------------------------------")
+        logging.info(
+            "------------------------------------[DYNAMICS]--------------------------------------------"
+        )
         logging.info(
             f"pos (m): {np.round(position, 4)} | vel (m/s): {np.round(velocity,4)} | acc (m/s/s): {np.round(acceleration, 4)}"
         )
@@ -101,9 +116,15 @@ def calculate_dynamics(
         logging.info(
             f"total mass (kg): {vehicle_mass:.4f} | propellant mass (kg): {propellant_mass:.4f} | mass flow (kg/s): {mass_flow_rate:.4f}"
         )
-        logging.info(f"")
+        logging.info("")
 
     derivatives = np.concatenate(
-        [velocity, acceleration, quaternion_derivative, angular_acceleration, [-mass_flow_rate]]
+        [
+            velocity,
+            acceleration,
+            quaternion_derivative,
+            angular_acceleration,
+            [-mass_flow_rate],
+        ]
     )
     return derivatives

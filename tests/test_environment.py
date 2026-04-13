@@ -1,4 +1,5 @@
 import numpy as np
+
 from environment import Environment
 
 
@@ -35,5 +36,7 @@ def test_drag_force(basic_environment, basic_vehicle):
 
 
 def test_drag_force_zero_vel(basic_environment, basic_vehicle):
-    drag = basic_environment.drag_force(np.array([0, 0, 1e6]), np.zeros(3), basic_vehicle, np.array([1, 0, 0, 0]))
+    drag = basic_environment.drag_force(
+        np.array([0, 0, 1e6]), np.zeros(3), basic_vehicle, np.array([1, 0, 0, 0])
+    )
     np.testing.assert_allclose(drag, [0, 0, 0])

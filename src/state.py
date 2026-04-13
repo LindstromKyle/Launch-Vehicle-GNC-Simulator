@@ -37,5 +37,11 @@ class State:
             1D state vector: [position, velocity, quaternion, ang_vel, prop_mass]
         """
         return np.concatenate(
-            [self.position, self.velocity, self.quaternion, self.angular_velocity, [self.propellant_mass]]
+            [
+                self.position,
+                self.velocity,
+                self.quaternion,
+                self.angular_velocity,
+                [self.propellant_mass],
+            ]
         )

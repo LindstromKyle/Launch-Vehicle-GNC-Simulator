@@ -1,8 +1,7 @@
-import numpy as np
 import re
-import matplotlib.pyplot as plt
 
-from plotting import plot_3D_integration_segments
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 def parse_log_to_structured_array(filename):
@@ -18,14 +17,20 @@ def parse_log_to_structured_array(filename):
             # Parse MISSION PLANNER
             mission_line = lines[i][6:].strip()  # Skip [INFO]
             parts = [p.strip() for p in mission_line.split("|")]
-            record["time"] = float(re.search(r"time \(s\): ([-.\deE]+)", parts[0]).group(1))
+            record["time"] = float(
+                re.search(r"time \(s\): ([-.\deE]+)", parts[0]).group(1)
+            )
             record["phase"] = re.search(r"phase: (.*)", parts[1]).group(1).strip()
 
             i += 1
             alt_line = lines[i][6:].strip()
             parts = [p.strip() for p in alt_line.split("|")]
-            record["current_altitude"] = float(re.search(r"current altitude \(km\): ([-.\deE]+)", parts[0]).group(1))
-            record["apoapsis_altitude"] = float(re.search(r"apoapsis altitude \(km\): ([-.\deE]+)", parts[1]).group(1))
+            record["current_altitude"] = float(
+                re.search(r"current altitude \(km\): ([-.\deE]+)", parts[0]).group(1)
+            )
+            record["apoapsis_altitude"] = float(
+                re.search(r"apoapsis altitude \(km\): ([-.\deE]+)", parts[1]).group(1)
+            )
             record["periapsis_altitude"] = float(
                 re.search(r"periapsis altitude \(km\): ([-.\deE]+)", parts[2]).group(1)
             )
@@ -33,9 +38,15 @@ def parse_log_to_structured_array(filename):
             i += 1
             vel_line = lines[i][6:].strip()
             parts = [p.strip() for p in vel_line.split("|")]
-            record["orbital_vel"] = float(re.search(r"orbital vel \(km/s\): ([-.\deE]+)", parts[0]).group(1))
-            record["tangential_vel"] = float(re.search(r"tangential vel \(km/s\): ([-.\deE]+)", parts[1]).group(1))
-            record["radial_vel"] = float(re.search(r"radial vel \(km/s\): ([-.\deE]+)", parts[2]).group(1))
+            record["orbital_vel"] = float(
+                re.search(r"orbital vel \(km/s\): ([-.\deE]+)", parts[0]).group(1)
+            )
+            record["tangential_vel"] = float(
+                re.search(r"tangential vel \(km/s\): ([-.\deE]+)", parts[1]).group(1)
+            )
+            record["radial_vel"] = float(
+                re.search(r"radial vel \(km/s\): ([-.\deE]+)", parts[2]).group(1)
+            )
 
             # Skip to GUIDANCE
             while i < len(lines) and "GUIDANCE" not in lines[i]:
@@ -45,14 +56,18 @@ def parse_log_to_structured_array(filename):
             if i >= len(lines):
                 break
             att_mode_line = lines[i][6:].strip()
-            record["attitude_mode"] = re.search(r"attitude mode: (.*)", att_mode_line).group(1).strip()
+            record["attitude_mode"] = (
+                re.search(r"attitude mode: (.*)", att_mode_line).group(1).strip()
+            )
 
             i += 1  # Now at current quat line
             quat_line = lines[i][6:].strip()
             parts = [p.strip() for p in quat_line.split("|")]
             quat_str = re.search(r"current quat: \[(.*?)\]", parts[0]).group(1)
             record["current_quat"] = np.fromstring(quat_str, sep=" ")
-            att_str = re.search(r"current attitude \(z_hat\): \[(.*?)\]", parts[1]).group(1)
+            att_str = re.search(
+                r"current attitude \(z_hat\): \[(.*?)\]", parts[1]
+            ).group(1)
             record["attitude"] = np.fromstring(att_str, sep=" ")
 
             i += 1
@@ -60,7 +75,9 @@ def parse_log_to_structured_array(filename):
             parts = [p.strip() for p in des_quat_line.split("|")]
             des_quat_str = re.search(r"desired quat: \[(.*?)\]", parts[0]).group(1)
             record["desired_quat"] = np.fromstring(des_quat_str, sep=" ")
-            des_att_str = re.search(r"desired attitude \(z_hat\): \[(.*?)\]", parts[1]).group(1)
+            des_att_str = re.search(
+                r"desired attitude \(z_hat\): \[(.*?)\]", parts[1]
+            ).group(1)
             record["desired_attitude"] = np.fromstring(des_att_str, sep=" ")
 
             i += 1
@@ -68,26 +85,36 @@ def parse_log_to_structured_array(filename):
             parts = [p.strip() for p in err_line.split("|")]
             err_quat_str = re.search(r"error quat: \[(.*?)\]", parts[0]).group(1)
             record["error_quat"] = np.fromstring(err_quat_str, sep=" ")
-            err_att_str = re.search(r"error attitude \(z_hat\): \[(.*?)\]", parts[1]).group(1)
+            err_att_str = re.search(
+                r"error attitude \(z_hat\): \[(.*?)\]", parts[1]
+            ).group(1)
             record["error_attitude"] = np.fromstring(err_att_str, sep=" ")
 
             i += 1
             current_pitch_line = lines[i][6:].strip()
             record["current_pitch"] = float(
-                re.search(r"current pitch \(deg\): ([-.\deE]+)", current_pitch_line).group(1)
+                re.search(
+                    r"current pitch \(deg\): ([-.\deE]+)", current_pitch_line
+                ).group(1)
             )
 
             i += 1
             desired_pitch_line = lines[i][6:].strip()
             record["desired_pitch"] = float(
-                re.search(r"desired pitch \(deg\): ([-.\deE]+)", desired_pitch_line).group(1)
+                re.search(
+                    r"desired pitch \(deg\): ([-.\deE]+)", desired_pitch_line
+                ).group(1)
             )
 
             i += 1
             pitch_error_line = lines[i][6:].strip()
             parts = [p.strip() for p in pitch_error_line.split("|")]
-            record["pitch_error"] = float(re.search(r"pitch error \(deg\): ([-.\deE]+)", parts[0]).group(1))
-            record["error_angle"] = float(re.search(r"quat error angle \(deg\): ([-.\deE]+)", parts[1]).group(1))
+            record["pitch_error"] = float(
+                re.search(r"pitch error \(deg\): ([-.\deE]+)", parts[0]).group(1)
+            )
+            record["error_angle"] = float(
+                re.search(r"quat error angle \(deg\): ([-.\deE]+)", parts[1]).group(1)
+            )
 
             # Skip to CONTROLLER
             while i < len(lines) and "CONTROLLER" not in lines[i]:
@@ -97,7 +124,9 @@ def parse_log_to_structured_array(filename):
             if i >= len(lines):
                 break
             body_error_line = lines[i][6:].strip()
-            body_err_str = re.search(r"body frame error \(deg\): \[(.*?)\]", body_error_line).group(1)
+            body_err_str = re.search(
+                r"body frame error \(deg\): \[(.*?)\]", body_error_line
+            ).group(1)
             record["body_frame_error"] = np.fromstring(body_err_str, sep=" ")
 
             i += 1
@@ -113,18 +142,26 @@ def parse_log_to_structured_array(filename):
             i += 1
             torque_line = lines[i][6:].strip()
             parts = [p.strip() for p in torque_line.split("|")]
-            des_torque_str = re.search(r"desired torque \(N\*m\): \[(.*?)\]", parts[0]).group(1)
+            des_torque_str = re.search(
+                r"desired torque \(N\*m\): \[(.*?)\]", parts[0]
+            ).group(1)
             record["desired_torque"] = np.fromstring(des_torque_str, sep=" ")
-            record["throttle"] = float(re.search(r"throttle: ([-.\deE]+)", torque_line).group(1))
+            record["throttle"] = float(
+                re.search(r"throttle: ([-.\deE]+)", torque_line).group(1)
+            )
 
             i += 1
             app_line = lines[i][6:].strip()
             parts = [p.strip() for p in app_line.split("|")]
-            app_torque_str = re.search(r"applied torque \(N\*m\): \[(.*?)\]", parts[0]).group(1)
+            app_torque_str = re.search(
+                r"applied torque \(N\*m\): \[(.*?)\]", parts[0]
+            ).group(1)
             record["applied_torque"] = np.fromstring(app_torque_str, sep=" ")
             ang_vel_str = re.search(r"ang vel \(rad/s\): \[(.*?)\]", parts[1]).group(1)
             record["ang_vel"] = np.fromstring(ang_vel_str, sep=" ")
-            ang_acc_str = re.search(r"ang acc \(rad/s/s\): \[(.*?)\]", parts[2]).group(1)
+            ang_acc_str = re.search(r"ang acc \(rad/s/s\): \[(.*?)\]", parts[2]).group(
+                1
+            )
             record["ang_acc"] = np.fromstring(ang_acc_str, sep=" ")
 
             i += 1
@@ -143,7 +180,9 @@ def parse_log_to_structured_array(filename):
                 gimbal_line = lines[i][6:].strip()
                 angle_strs = re.findall(r"\[(.*?)\]", gimbal_line)
                 for k, angle_str in enumerate(angle_strs):
-                    gimbal_angles[indices_list[j][k]] = np.fromstring(angle_str, sep=" ")
+                    gimbal_angles[indices_list[j][k]] = np.fromstring(
+                        angle_str, sep=" "
+                    )
                 i += 1
 
             record["engine_gimbal_angles"] = gimbal_angles
@@ -179,9 +218,15 @@ def parse_log_to_structured_array(filename):
             i += 1
             mass_line = lines[i][6:].strip()
             parts = [p.strip() for p in mass_line.split("|")]
-            record["total_mass"] = float(re.search(r"total mass \(kg\): ([-.\deE]+)", parts[0]).group(1))
-            record["propellant_mass"] = float(re.search(r"propellant mass \(kg\): ([-.\deE]+)", parts[1]).group(1))
-            record["mass_flow"] = float(re.search(r"mass flow \(kg/s\): ([-.\deE]+)", parts[2]).group(1))
+            record["total_mass"] = float(
+                re.search(r"total mass \(kg\): ([-.\deE]+)", parts[0]).group(1)
+            )
+            record["propellant_mass"] = float(
+                re.search(r"propellant mass \(kg\): ([-.\deE]+)", parts[1]).group(1)
+            )
+            record["mass_flow"] = float(
+                re.search(r"mass flow \(kg/s\): ([-.\deE]+)", parts[2]).group(1)
+            )
 
             data.append(record)
 
@@ -363,7 +408,10 @@ def plot_exhaust_flow_directions(time_value, structured_data, exaggerate_factor)
     # Define engine positions in body frame (xy plane at z=0, Falcon 9-like arrangement)
     engine_radius = 1.5  # From vehicle.py
     theta = np.linspace(0, 2 * np.pi, 8, endpoint=False)
-    positions = [np.array([engine_radius * np.cos(t), engine_radius * np.sin(t), 0.0]) for t in theta]
+    positions = [
+        np.array([engine_radius * np.cos(t), engine_radius * np.sin(t), 0.0])
+        for t in theta
+    ]
     positions.append(np.array([0.0, 0.0, 0.0]))  # Center engine
     positions = np.array(positions)
 
@@ -379,7 +427,9 @@ def plot_exhaust_flow_directions(time_value, structured_data, exaggerate_factor)
         yaw_rad = gimbal_angles_rad[i, 1]
 
         # Thrust direction in body frame (from vehicle.py)
-        thrust_dir_body = np.array([np.sin(yaw_rad), -np.sin(pitch_rad), np.cos(pitch_rad) * np.cos(yaw_rad)])
+        thrust_dir_body = np.array(
+            [np.sin(yaw_rad), -np.sin(pitch_rad), np.cos(pitch_rad) * np.cos(yaw_rad)]
+        )
         thrust_dir_body /= np.linalg.norm(thrust_dir_body)  # Normalize
 
         # Exhaust direction is opposite to thrust (exhaust flows away from rocket)
@@ -419,15 +469,22 @@ def plot_exhaust_flow_directions(time_value, structured_data, exaggerate_factor)
     ax.view_init(elev=90, azim=-90)
 
     # Title
-    plt.title(f"Engine Exhaust Directions at t = {times[idx]:.2f} s \n" f"Applied Torque (N*m): {applied_torque}")
+    plt.title(
+        f"Engine Exhaust Directions at t = {times[idx]:.2f} s \n"
+        f"Applied Torque (N*m): {applied_torque}"
+    )
     plt.show()
 
 
-def standard_plot_vs_time(field_names: list, structured_array: np.ndarray, y_axis_name: str, title: str):
+def standard_plot_vs_time(
+    field_names: list, structured_array: np.ndarray, y_axis_name: str, title: str
+):
     fig, ax = plt.subplots()
 
     for field_name in field_names:
-        ax.plot(structured_array["time"], structured_array[field_name], label=field_name)
+        ax.plot(
+            structured_array["time"], structured_array[field_name], label=field_name
+        )
 
     ax.set_xlabel("Time (s)")
     ax.set_ylabel(y_axis_name)
@@ -465,14 +522,22 @@ if __name__ == "__main__":
 
     # plot_exhaust_flow_directions(15, array, exaggerate_factor=30000)
 
-    standard_plot_vs_time(["desired_pitch", "current_pitch"], array, "Pitch Angle (deg)", "Pitch Angle vs Time")
+    standard_plot_vs_time(
+        ["desired_pitch", "current_pitch"],
+        array,
+        "Pitch Angle (deg)",
+        "Pitch Angle vs Time",
+    )
 
     # standard_plot_vs_time(["current_altitude", "orbital_vel"], array)
 
     # standard_plot_vs_time(["radial_vel", "tangential_vel", "orbital_vel"], array, "Velocity (m/s)", "Velocity vs Time")
 
     standard_plot_vs_time(
-        ["apoapsis_altitude", "periapsis_altitude", "current_altitude"], array, "Altitude (km)", "Altitude vs Time"
+        ["apoapsis_altitude", "periapsis_altitude", "current_altitude"],
+        array,
+        "Altitude (km)",
+        "Altitude vs Time",
     )
 
     # standard_plot_vs_time(

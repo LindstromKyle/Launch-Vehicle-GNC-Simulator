@@ -1,6 +1,7 @@
 from enum import Enum
+from typing import Any, Dict, List
+
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
 
 
 class SimResults(str, Enum):
@@ -117,7 +118,7 @@ class MonteCarloRequest(BaseModel):
     num_simulations: int = Field(
         10,
         ge=1,
-        le=100,
+        le=500,
         description="Number of individual simulations in this Monte Carlo batch",
     )
 

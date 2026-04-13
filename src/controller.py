@@ -1,10 +1,15 @@
 import logging
-import numpy as np
-
-from scipy.optimize import nnls
 from abc import ABC, abstractmethod
 
-from utils import quaternion_multiply, quaternion_inverse, quat_to_angle_axis, rotate_body_to_inertial_by_quat
+import numpy as np
+from scipy.optimize import nnls
+
+from utils import (
+    quat_to_angle_axis,
+    quaternion_inverse,
+    quaternion_multiply,
+    rotate_body_to_inertial_by_quat,
+)
 from vehicle import Vehicle
 
 
@@ -101,7 +106,9 @@ class PIDAttitudeController(Controller):
         # Check if the guidance is in passive mode
         if not np.all(desired_quaternion == current_quaternion):
             # Compute quaternion error
-            error_quaternion = quaternion_multiply(desired_quaternion, quaternion_inverse(current_quaternion))
+            error_quaternion = quaternion_multiply(
+                desired_quaternion, quaternion_inverse(current_quaternion)
+            )
             error_quaternion /= np.linalg.norm(error_quaternion)
 
             # Enforce the shortest rotation
@@ -116,7 +123,9 @@ class PIDAttitudeController(Controller):
 
             # Basic gain scheduling
             current_mass = self.vehicle.dry_mass + current_propellant_mass
-            mass_ratio = current_mass / (self.vehicle.dry_mass + self.vehicle.initial_propellant_mass)
+            mass_ratio = current_mass / (
+                self.vehicle.dry_mass + self.vehicle.initial_propellant_mass
+            )
             kp_scheduled = self.kp.copy() * mass_ratio
             kd_scheduled = self.kd.copy() * mass_ratio
 
@@ -124,8 +133,12 @@ class PIDAttitudeController(Controller):
             if throttle <= 0.01:
                 prev_error_angle = np.rad2deg(previous_angle_axis[0])
                 error_angle = np.rad2deg(angle_axis[0])
-                hysteresis_inner_flag = (prev_error_angle > error_angle) and (error_angle < 0.1)
-                hysteresis_outer_flag = (prev_error_angle < error_angle) and (error_angle < 3.5)
+                hysteresis_inner_flag = (prev_error_angle > error_angle) and (
+                    error_angle < 0.1
+                )
+                hysteresis_outer_flag = (prev_error_angle < error_angle) and (
+                    error_angle < 3.5
+                )
                 if hysteresis_inner_flag or hysteresis_outer_flag:
                     kp_scheduled = 0
                     kd_scheduled = 0
@@ -155,13 +168,17 @@ class PIDAttitudeController(Controller):
             effective_thrust_magnitude = self.vehicle.get_thrust_magnitude(throttle)
             gimbal_arm = self.vehicle.get_gimbal_arm(current_propellant_mass)
             thrust_per_engine = effective_thrust_magnitude / self.vehicle.num_engines
-            gimbal_angles_list, rcs_levels, achieved_torque = self.get_actuator_commands(
-                unsaturated_torque, thrust_per_engine, gimbal_arm
+            gimbal_angles_list, rcs_levels, achieved_torque = (
+                self.get_actuator_commands(
+                    unsaturated_torque, thrust_per_engine, gimbal_arm
+                )
             )
 
             # Anti-windup - limit integral error based on saturation (if achieved_torque != unsaturated_torque)
             mask = self.ki != 0
-            self.integral_error[mask] = (achieved_torque[mask] - p_term[mask] - d_term[mask]) / self.ki[mask]
+            self.integral_error[mask] = (
+                achieved_torque[mask] - p_term[mask] - d_term[mask]
+            ) / self.ki[mask]
 
         else:
             # Everything is passive
@@ -180,16 +197,26 @@ class PIDAttitudeController(Controller):
             d_term = np.zeros(3)
 
         if log_flag:
-            current_z_unit_vector = rotate_body_to_inertial_by_quat(np.array([0, 0, 1]), current_quaternion)
-            desired_z_unit_vector = rotate_body_to_inertial_by_quat(np.array([0, 0, 1]), desired_quaternion)
+            current_z_unit_vector = rotate_body_to_inertial_by_quat(
+                np.array([0, 0, 1]), current_quaternion
+            )
+            desired_z_unit_vector = rotate_body_to_inertial_by_quat(
+                np.array([0, 0, 1]), desired_quaternion
+            )
             attitude_error = desired_z_unit_vector - current_z_unit_vector
             position = state_vector[:3]
             radial_unit_vector = position / np.linalg.norm(position)
             current_dot = np.dot(current_z_unit_vector, radial_unit_vector)
             desired_dot = np.dot(desired_z_unit_vector, radial_unit_vector)
-            current_pitch = np.rad2deg(np.pi / 2 - np.arccos(np.clip(current_dot, -1.0, 1.0)))
-            desired_pitch = np.rad2deg(np.pi / 2 - np.arccos(np.clip(desired_dot, -1.0, 1.0)))
-            logging.info(f"------------------------------------[GUIDANCE]--------------------------------------------")
+            current_pitch = np.rad2deg(
+                np.pi / 2 - np.arccos(np.clip(current_dot, -1.0, 1.0))
+            )
+            desired_pitch = np.rad2deg(
+                np.pi / 2 - np.arccos(np.clip(desired_dot, -1.0, 1.0))
+            )
+            logging.info(
+                "------------------------------------[GUIDANCE]--------------------------------------------"
+            )
             logging.info(f"attitude mode: {attitude_mode}")
             logging.info(
                 f"current quat: {np.round(current_quaternion, 4)} | current attitude (z_hat): {np.round(current_z_unit_vector, 4)}"
@@ -205,12 +232,18 @@ class PIDAttitudeController(Controller):
             logging.info(
                 f"pitch error (deg): {(desired_pitch - current_pitch):.2f} | quat error angle (deg): {np.round(np.rad2deg(angle_axis[0]), 4)}"
             )
-            logging.info(f"-----------------------------------[CONTROLLER]-------------------------------------------")
-            logging.info(f"body frame error (deg): {np.round(np.rad2deg(current_error), 4)}")
+            logging.info(
+                "-----------------------------------[CONTROLLER]-------------------------------------------"
+            )
+            logging.info(
+                f"body frame error (deg): {np.round(np.rad2deg(current_error), 4)}"
+            )
             logging.info(
                 f"PID p term: {np.round(p_term, 4)} | PID i term: {np.round(i_term, 4)} | PID d term: {np.round(d_term, 4)}"
             )
-            logging.info(f"desired torque (N*m): {np.round(unsaturated_torque, 4)} | throttle: {throttle:.4f}")
+            logging.info(
+                f"desired torque (N*m): {np.round(unsaturated_torque, 4)} | throttle: {throttle:.4f}"
+            )
         return {
             "engine_gimbal_angles": gimbal_angles_list,
             "rcs_levels": rcs_levels,
