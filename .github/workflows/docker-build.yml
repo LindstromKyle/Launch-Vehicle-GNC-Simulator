@@ -2,8 +2,22 @@ name: Docker Build
 
 on:
   push:
-    branches: ["main"]
+    paths:
+      - Dockerfile
+      - docker-compose.yml
+      - requirements.txt
+      - requirements-dev.txt
+      - src/**
+      - .github/workflows/docker-build.yml
   pull_request:
+    paths:
+      - Dockerfile
+      - docker-compose.yml
+      - requirements.txt
+      - requirements-dev.txt
+      - src/**
+      - .github/workflows/docker-build.yml
+  workflow_dispatch:
 
 jobs:
   build-image:
