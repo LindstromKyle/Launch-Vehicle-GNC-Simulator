@@ -61,7 +61,7 @@ def plot_metric_distributions(rows: List[Dict[str, float]], batch_id: str) -> No
         ("final_altitude_km", "Final Altitude (km)"),
         ("apoapsis_altitude_km", "Apoapsis Altitude (km)"),
         ("periapsis_altitude_km", "Periapsis Altitude (km)"),
-        ("eccentricity", "Eccentricity (-)"),
+        ("eccentricity", "Eccentricity"),
     ]
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
@@ -75,8 +75,9 @@ def plot_metric_distributions(rows: List[Dict[str, float]], batch_id: str) -> No
             continue
 
         # bins = min(20, max(8, int(np.sqrt(vals.size))))
-        bins = vals.size
+        bins = 40
         ax.hist(vals, bins=bins, alpha=0.8, edgecolor="black")
+
         ax.axvline(
             np.mean(vals),
             linestyle="--",
@@ -107,16 +108,14 @@ def plot_dispersion_sensitivity(
     plots = [
         (y_apo, "Apoapsis Altitude (km)"),
         (y_peri, "Periapsis Altitude (km)"),
-        (y_ecc, "Eccentricity (-)"),
+        (y_ecc, "Eccentricity"),
     ]
 
     for ax, (y, y_label) in zip(axes, plots):
         normal_mask = np.isfinite(x) & np.isfinite(y) & (~escape)
         escape_mask = np.isfinite(x) & np.isfinite(y) & escape
 
-        ax.scatter(
-            x[normal_mask], y[normal_mask], s=26, alpha=0.8, label="Bounded orbit"
-        )
+        ax.scatter(x[normal_mask], y[normal_mask], s=26, alpha=0.8)
         if np.any(escape_mask):
             ax.scatter(
                 x[escape_mask],
@@ -130,34 +129,13 @@ def plot_dispersion_sensitivity(
         ax.set_xlabel(dispersion_key)
         ax.set_ylabel(y_label)
         ax.grid(alpha=0.3)
-        ax.legend()
-
-    fig.tight_layout()
-
-
-def plot_orbit_regime_breakdown(rows: List[Dict[str, float]], batch_id: str) -> None:
-    escape = int(np.sum(to_array(rows, "is_escape_orbit") > 0.5))
-    bounded = max(0, len(rows) - escape)
-
-    fig, ax = plt.subplots(figsize=(6.5, 4.2))
-    labels = ["Bounded Orbit", "Escape/Hyperbolic"]
-    values = [bounded, escape]
-    colors = ["#2a9d8f", "#e76f51"]
-
-    ax.bar(labels, values, color=colors)
-    ax.set_title(f"Orbit Regime Breakdown | Batch {batch_id}")
-    ax.set_ylabel("Simulation Count")
-    ax.grid(axis="y", alpha=0.3)
-
-    for i, v in enumerate(values):
-        ax.text(i, v + 0.2, str(v), ha="center", va="bottom")
 
     fig.tight_layout()
 
 
 if __name__ == "__main__":
     batch_file = Path(
-        "C:\\Users\\linds\\code\\Launch-Vehicle-GNC-Simulator\\src\\mc_results\\1de5930c-a95c-485f-8c4e-62814b4f4ffd.json"
+        "C:\\Users\\linds\\code\\Launch-Vehicle-GNC-Simulator\\src\\mc_results\\80831c57-a485-4ecd-b8f9-493a8b6b75ab.json"
     )
 
     batch = load_batch(batch_file)
@@ -171,7 +149,6 @@ if __name__ == "__main__":
     dispersion_keys = get_dispersion_keys(batch)
 
     plot_metric_distributions(rows, batch_id)
-    plot_orbit_regime_breakdown(rows, batch_id)
 
     if dispersion_keys:
         primary_key = dispersion_keys[0]

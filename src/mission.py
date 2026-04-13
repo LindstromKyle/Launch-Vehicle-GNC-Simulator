@@ -1,4 +1,5 @@
 import logging
+
 import numpy as np
 
 from environment import Environment
@@ -19,7 +20,11 @@ class MissionPlanner:
     """
 
     def __init__(
-        self, guidance_phases: list[GuidancePhase], environment: Environment, vehicle: Vehicle, start_time: float = 0.0
+        self,
+        guidance_phases: list[GuidancePhase],
+        environment: Environment,
+        vehicle: Vehicle,
+        start_time: float = 0.0,
     ):
         self.guidance_phases = guidance_phases
         self.current_phase_idx = 0
@@ -45,7 +50,9 @@ class MissionPlanner:
             print(f"\n'{self.current_phase.name}' phase complete at t = {time:.2f}s.")
             self.current_phase_idx += 1
             if self.current_phase_idx < len(self.guidance_phases):
-                self.phase_transitions.append((time, self.guidance_phases[self.current_phase_idx].name))
+                self.phase_transitions.append(
+                    (time, self.guidance_phases[self.current_phase_idx].name)
+                )
             else:
                 logging.info(f"Integration segment complete at t = {time:.2f}s")
                 return {"throttle": 0.0, "attitude_mode": "prograde"}
@@ -68,13 +75,17 @@ class MissionPlanner:
                 if orbital_velocity**2 - radial_velocity**2 > 0.0
                 else 0.0
             )
-            logging.info(f"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-            logging.info(f"---------------------------------[MISSION PLANNER]----------------------------------------")
+            logging.info(
+                "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+            )
+            logging.info(
+                "---------------------------------[MISSION PLANNER]----------------------------------------"
+            )
             logging.info(f"time (s): {time:.2f} | phase: {self.current_phase.name}")
             logging.info(
                 f"current altitude (km): {altitude:.4f} | "
-                f"apoapsis altitude (km): {((elements["apoapsis_radius"] - self.environment.earth_radius) / 1000):.4f} | "
-                f"periapsis altitude (km): {((elements["periapsis_radius"] - self.environment.earth_radius) / 1000):.4f}"
+                f"apoapsis altitude (km): {((elements['apoapsis_radius'] - self.environment.earth_radius) / 1000):.4f} | "
+                f"periapsis altitude (km): {((elements['periapsis_radius'] - self.environment.earth_radius) / 1000):.4f}"
             )
             logging.info(
                 f"orbital vel (km/s): {orbital_velocity/1000:.4f} | tangential vel (km/s): {tangential_velocity/1000:.4f} | radial vel (km/s): {radial_velocity/1000:.4f}"

@@ -1,15 +1,15 @@
 import logging
-import numpy as np
-
-from typing import Tuple
 from abc import ABC, abstractmethod
+from typing import Tuple
+
+import numpy as np
 
 from environment import Environment
 from utils import (
     compute_body_z_to_inertial_quat,
-    quaternion_from_attitude_mode,
-    compute_time_to_apoapsis,
     compute_orbital_elements,
+    compute_time_to_apoapsis,
+    quaternion_from_attitude_mode,
 )
 from vehicle import Vehicle
 
@@ -34,7 +34,9 @@ class GuidancePhase(ABC):
         pass
 
     @abstractmethod
-    def get_setpoints(self, time: float, state_vector: np.ndarray) -> Tuple[np.ndarray, float]:
+    def get_setpoints(
+        self, time: float, state_vector: np.ndarray
+    ) -> Tuple[np.ndarray, float]:
         """
         Return the guidance setpoints for this phase.
 
@@ -59,7 +61,13 @@ class TimeBasedGuidancePhase(GuidancePhase):
         name: Name of the phase
     """
 
-    def __init__(self, end_time: float, attitude_mode: str, throttle: float = 1.0, name: str = "Unnamed"):
+    def __init__(
+        self,
+        end_time: float,
+        attitude_mode: str,
+        throttle: float = 1.0,
+        name: str = "Unnamed",
+    ):
         self.end_time = end_time
         self.attitude_mode = attitude_mode
         self.throttle = throttle
@@ -68,8 +76,12 @@ class TimeBasedGuidancePhase(GuidancePhase):
     def is_complete(self, time: float, state_vector: np.ndarray) -> bool:
         return time >= self.end_time
 
-    def get_setpoints(self, time: float, state_vector: np.ndarray) -> Tuple[np.ndarray, float]:
-        desired_quaternion = quaternion_from_attitude_mode(state_vector, self.attitude_mode)
+    def get_setpoints(
+        self, time: float, state_vector: np.ndarray
+    ) -> Tuple[np.ndarray, float]:
+        desired_quaternion = quaternion_from_attitude_mode(
+            state_vector, self.attitude_mode
+        )
         throttle = self.throttle
         return desired_quaternion, throttle
 
@@ -114,16 +126,19 @@ class ProgrammedPitchGuidancePhase(GuidancePhase):
     def is_complete(self, time: float, state_vector: np.ndarray) -> bool:
         return time >= self.end_time
 
-    def get_setpoints(self, time: float, state_vector: np.ndarray) -> Tuple[np.ndarray, float]:
+    def get_setpoints(
+        self, time: float, state_vector: np.ndarray
+    ) -> Tuple[np.ndarray, float]:
         position = state_vector[:3]
-        velocity = state_vector[3:6]
         radial_unit_vector = position / np.linalg.norm(position)
 
         # Normalize time progress (0 to 1)
         progress = max(0.0, min(1.0, (time - self.start_time) / self.duration))
 
         # Interpolate pitch angle (from horizontal)
-        pitch_deg = self.initial_pitch_deg + progress * (self.final_pitch_deg - self.initial_pitch_deg)
+        pitch_deg = self.initial_pitch_deg + progress * (
+            self.final_pitch_deg - self.initial_pitch_deg
+        )
         pitch_rad = np.deg2rad(pitch_deg)
 
         cross_product = np.cross(self.orbital_normal, radial_unit_vector)
@@ -133,12 +148,18 @@ class ProgrammedPitchGuidancePhase(GuidancePhase):
         else:
             # Fallback if zero
             horizontal_projection = (
-                self.kick_direction - np.dot(self.kick_direction, radial_unit_vector) * radial_unit_vector
+                self.kick_direction
+                - np.dot(self.kick_direction, radial_unit_vector) * radial_unit_vector
             )
-            horizontal_unit_vector = horizontal_projection / np.linalg.norm(horizontal_projection)
+            horizontal_unit_vector = horizontal_projection / np.linalg.norm(
+                horizontal_projection
+            )
 
         # Desired z
-        desired_z_vector = np.cos(pitch_rad) * horizontal_unit_vector + np.sin(pitch_rad) * radial_unit_vector
+        desired_z_vector = (
+            np.cos(pitch_rad) * horizontal_unit_vector
+            + np.sin(pitch_rad) * radial_unit_vector
+        )
         desired_z_vector /= np.linalg.norm(desired_z_vector)
 
         desired_quaternion = compute_body_z_to_inertial_quat(desired_z_vector)
@@ -187,7 +208,9 @@ class PEGGuidancePhase(GuidancePhase):
         self.orbital_normal = orbital_normal
         self.vehicle = vehicle
         self.target_sem_maj_axis = (self.target_apoapsis + self.target_periapsis) / 2
-        self.target_e = (self.target_apoapsis - self.target_periapsis) / (self.target_apoapsis + self.target_periapsis)
+        self.target_e = (self.target_apoapsis - self.target_periapsis) / (
+            self.target_apoapsis + self.target_periapsis
+        )
         self.target_inclination = target_inclination
         self.apo_tolerance = apo_tolerance
         self.peri_tolerance = peri_tolerance
@@ -206,8 +229,14 @@ class PEGGuidancePhase(GuidancePhase):
         velocity = state_vector[3:6]
         self.elements = compute_orbital_elements(position, velocity, self.mu)
         # Check peri and apo
-        apo_ok = abs(self.elements["apoapsis_radius"] - self.target_apoapsis) <= self.apo_tolerance
-        peri_ok = abs(self.elements["periapsis_radius"] - self.target_periapsis) <= self.peri_tolerance
+        apo_ok = (
+            abs(self.elements["apoapsis_radius"] - self.target_apoapsis)
+            <= self.apo_tolerance
+        )
+        peri_ok = (
+            abs(self.elements["periapsis_radius"] - self.target_periapsis)
+            <= self.peri_tolerance
+        )
         # Check inclination if specified
         inc_ok = True
         if self.target_inclination is not None:
@@ -215,10 +244,14 @@ class PEGGuidancePhase(GuidancePhase):
             h_norm = np.linalg.norm(h_vec)
             if h_norm > 0:
                 inc_current = np.rad2deg(np.arccos(h_vec[2] / h_norm))
-                inc_ok = abs(inc_current - self.target_inclination) <= 0.1  # 0.1 deg tolerance
+                inc_ok = (
+                    abs(inc_current - self.target_inclination) <= 0.1
+                )  # 0.1 deg tolerance
         return apo_ok and peri_ok and inc_ok
 
-    def get_setpoints(self, time: float, state_vector: np.ndarray) -> Tuple[np.ndarray, float]:
+    def get_setpoints(
+        self, time: float, state_vector: np.ndarray
+    ) -> Tuple[np.ndarray, float]:
         # Compute orbital elements
         position = state_vector[0:3]
         velocity = state_vector[3:6]
@@ -243,19 +276,27 @@ class PEGGuidancePhase(GuidancePhase):
         current_tangential_vel = np.dot(velocity, horizontal_unit)
 
         # Compute required delta V (diff between current and desired)
-        v_target = np.sqrt(self.mu * (2 / self.target_periapsis - 1 / self.target_sem_maj_axis))
+        v_target = np.sqrt(
+            self.mu * (2 / self.target_periapsis - 1 / self.target_sem_maj_axis)
+        )
         required_delta_v = max(0.0, v_target - current_tangential_vel)
 
         # Compute gravity
         # TODO: this assumes constant gravity from this point to the end of burn
         g = self.mu / position_magnitude**2
-        centrifugal = current_tangential_vel**2 / position_magnitude if position_magnitude > 0 else 0.0
+        centrifugal = (
+            current_tangential_vel**2 / position_magnitude
+            if position_magnitude > 0
+            else 0.0
+        )
         g_net = centrifugal - g
 
         # TODO: this PEG implementation seems to be unstable at small delta V. For now use prograde at
         #  the end of the burn
         if required_delta_v <= 500.0:
-            logging.warning(f"PEG MODE - REQUIRED DELTA V SMALL: {required_delta_v}. DEFAULT TO CURRENT ATTITUDE")
+            logging.warning(
+                f"PEG MODE - REQUIRED DELTA V SMALL: {required_delta_v}. DEFAULT TO CURRENT ATTITUDE"
+            )
             self.attitude_mode = "prograde"
             return state_vector[6:10], self.throttle
 
@@ -281,7 +322,11 @@ class PEGGuidancePhase(GuidancePhase):
             # 1st order thurst integral (m)
             b1 = time_to_prop_deplete * b0 - v_e * time_to_go
             # 2nd order thurst integral (m*s)
-            b2 = time_to_prop_deplete**2 * b0 - v_e * time_to_prop_deplete * time_to_go - 0.5 * v_e * time_to_go**2
+            b2 = (
+                time_to_prop_deplete**2 * b0
+                - v_e * time_to_prop_deplete * time_to_go
+                - 0.5 * v_e * time_to_go**2
+            )
             # 0th order position integral (m)
             c0 = b0 * time_to_go - b1
             # 1st order position integral (m*s)
@@ -350,7 +395,9 @@ class PEGGuidancePhase(GuidancePhase):
         f_theta = np.sqrt(max(0.0, 1 - f_r**2 - f_n**2))
 
         # Construct desired thrust vector from three components
-        desired_z_vector = f_r * radial_unit + f_theta * horizontal_unit + f_n * self.orbital_normal
+        desired_z_vector = (
+            f_r * radial_unit + f_theta * horizontal_unit + f_n * self.orbital_normal
+        )
         desired_z_vector /= np.linalg.norm(desired_z_vector)
         desired_quaternion = compute_body_z_to_inertial_quat(desired_z_vector)
 
@@ -360,7 +407,9 @@ class PEGGuidancePhase(GuidancePhase):
         # Find largest error
         max_error = max(apo_error, peri_error)
         # Compute threshold for when to start throttling
-        throttle_threshold = self.throttle_threshold_factor * max(self.apo_tolerance, self.peri_tolerance)
+        throttle_threshold = self.throttle_threshold_factor * max(
+            self.apo_tolerance, self.peri_tolerance
+        )
         if max_error < throttle_threshold:
             # Apply proportional control to normalized error
             normalized_error = max_error / self.target_apoapsis
@@ -413,7 +462,9 @@ class CoastGuidancePhase(GuidancePhase):
             or self.elements["apoapsis_radius"] == float("inf")
             or self.elements["semi_major_axis"] <= 0
         ):
-            time_to_apo = compute_time_to_apoapsis(position, velocity, self.elements, self.mu)
+            time_to_apo = compute_time_to_apoapsis(
+                position, velocity, self.elements, self.mu
+            )
             return time_to_apo <= self.time_to_apo_threshold
 
         # Dynamic computation
@@ -437,11 +488,17 @@ class CoastGuidancePhase(GuidancePhase):
         burn_time = (m0 * ve / T) * (1 - np.exp(-delta_v / ve))
         half_burn = burn_time / 2 + self.buffer
 
-        time_to_apo = compute_time_to_apoapsis(position, velocity, self.elements, self.mu)
+        time_to_apo = compute_time_to_apoapsis(
+            position, velocity, self.elements, self.mu
+        )
         return time_to_apo <= half_burn
 
-    def get_setpoints(self, time: float, state_vector: np.ndarray) -> Tuple[np.ndarray, float]:
-        desired_quaternion = quaternion_from_attitude_mode(state_vector, self.attitude_mode)
+    def get_setpoints(
+        self, time: float, state_vector: np.ndarray
+    ) -> Tuple[np.ndarray, float]:
+        desired_quaternion = quaternion_from_attitude_mode(
+            state_vector, self.attitude_mode
+        )
         throttle = 0.0
         return desired_quaternion, throttle
 
@@ -493,13 +550,20 @@ class CircBurnGuidancePhase(GuidancePhase):
 
         return ecc_ok
 
-    def get_setpoints(self, time: float, state_vector: np.ndarray) -> Tuple[np.ndarray, float]:
-        desired_quaternion = quaternion_from_attitude_mode(state_vector, self.attitude_mode)
+    def get_setpoints(
+        self, time: float, state_vector: np.ndarray
+    ) -> Tuple[np.ndarray, float]:
+        desired_quaternion = quaternion_from_attitude_mode(
+            state_vector, self.attitude_mode
+        )
         if self.elements is None:
             position = state_vector[:3]
             velocity = state_vector[3:6]
             self.elements = compute_orbital_elements(position, velocity, self.mu)
-        if self.elements["apoapsis_radius"] == float("inf") or self.elements["periapsis_radius"] <= 0:
+        if (
+            self.elements["apoapsis_radius"] == float("inf")
+            or self.elements["periapsis_radius"] <= 0
+        ):
             # Safety: Fallback for hyperbolic or invalid orbits
             throttle = 0.0
         else:

@@ -5,7 +5,10 @@ from utils import compute_acceleration, quat_to_angle_axis
 
 
 def plot_3D_integration_segments(
-    t_vals: np.ndarray, state_vals: np.ndarray, phase_transitions: list | None = None, show_earth: bool = False
+    t_vals: np.ndarray,
+    state_vals: np.ndarray,
+    phase_transitions: list | None = None,
+    show_earth: bool = False,
 ):
     """
     Plot 3D trajectory colored by mission phase segments.
@@ -37,7 +40,9 @@ def plot_3D_integration_segments(
         # Segment by phase transitions
         for phase_index, (start_time, phase_name) in enumerate(phase_transitions):
             end_time = (
-                phase_transitions[phase_index + 1][0] if phase_index + 1 < len(phase_transitions) else t_vals[-1]
+                phase_transitions[phase_index + 1][0]
+                if phase_index + 1 < len(phase_transitions)
+                else t_vals[-1]
             )
 
             mask = (t_vals >= start_time) & (t_vals < end_time)
@@ -127,8 +132,12 @@ def plot_3D_trajectory(t_vals: np.ndarray, state_vals: np.ndarray) -> None:
         linewidth=2,
         color="dodgerblue",
     )
-    ax.scatter([x_vals[0]], [y_vals[0]], [z_vals[0]], color="green", label="Launch", s=50)
-    ax.scatter([x_vals[-1]], [y_vals[-1]], [z_vals[-1]], color="red", label="Final point", s=50)
+    ax.scatter(
+        [x_vals[0]], [y_vals[0]], [z_vals[0]], color="green", label="Launch", s=50
+    )
+    ax.scatter(
+        [x_vals[-1]], [y_vals[-1]], [z_vals[-1]], color="red", label="Final point", s=50
+    )
 
     ax.set_xlabel("X (km)")
     ax.set_ylabel("Y (km)")
@@ -140,7 +149,9 @@ def plot_3D_trajectory(t_vals: np.ndarray, state_vals: np.ndarray) -> None:
     plt.show()
 
 
-def plot_1D_position_velocity_acceleration(t_vals: np.ndarray, state_vals: np.ndarray, axis: str, environment) -> None:
+def plot_1D_position_velocity_acceleration(
+    t_vals: np.ndarray, state_vals: np.ndarray, axis: str, environment
+) -> None:
     """
     Plot altitude, velocity, and acceleration vs time for one axis.
 

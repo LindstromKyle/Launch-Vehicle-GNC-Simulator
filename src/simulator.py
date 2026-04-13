@@ -1,13 +1,14 @@
 import logging
 from pathlib import Path
+
 import numpy as np
 
+from controller import Controller
 from environment import Environment
-from integrator import integrate_rk4, integrate_verlet
+from integrator import integrate_verlet
 from mission import MissionPlanner
 from state import State
 from vehicle import Vehicle
-from controller import Controller
 
 
 class Simulator:
@@ -74,9 +75,9 @@ class Simulator:
         log_dir = Path(__file__).parent.parent / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         logfile = log_dir / f"{self.log_name}.log"
-        
+
         # Set up logging
-        logging.basicConfig( 
+        logging.basicConfig(
             filename=logfile,
             level=logging.INFO,
             format="[%(levelname)s] %(message)s",

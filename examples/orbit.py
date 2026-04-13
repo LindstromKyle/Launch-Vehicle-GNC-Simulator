@@ -3,11 +3,11 @@ import numpy as np
 from controller import PIDAttitudeController
 from environment import Environment
 from guidance import (
-    TimeBasedGuidancePhase,
-    ProgrammedPitchGuidancePhase,
-    PEGGuidancePhase,
-    CoastGuidancePhase,
     CircBurnGuidancePhase,
+    CoastGuidancePhase,
+    PEGGuidancePhase,
+    ProgrammedPitchGuidancePhase,
+    TimeBasedGuidancePhase,
 )
 from mission import MissionPlanner
 from plotting import plot_3D_integration_segments
@@ -165,7 +165,7 @@ stage1_sim = Simulator(
 )
 stage1_sim.add_controller(ascent_controller)
 
-print(f"---------- INTEGRATION SEGMENT 1 ----------")
+print("---------- INTEGRATION SEGMENT 1 ----------")
 stage1_t_vals, stage1_state_vals, stage1_phase_transitions = stage1_sim.run()
 
 """

@@ -14,9 +14,13 @@ class Environment:
         self.earth_mass = 5.972e24
         self.gravitational_constant = 6.67430e-11
         self.earth_rotation_rate = 7.292115e-5  # rad/s (sidereal rotation)
-        self.earth_angular_velocity_vector = np.array([0.0, 0.0, self.earth_rotation_rate])  # inertial
+        self.earth_angular_velocity_vector = np.array(
+            [0.0, 0.0, self.earth_rotation_rate]
+        )  # inertial
 
-    def gravitational_force(self, position: np.ndarray, vehicle_mass: float) -> np.ndarray:
+    def gravitational_force(
+        self, position: np.ndarray, vehicle_mass: float
+    ) -> np.ndarray:
         """
         Compute gravitational force including J2 oblateness perturbation.
 
@@ -32,14 +36,24 @@ class Environment:
             return np.zeros(3)
 
         # Pure Newtonian
-        newtonian_force = -self.gravitational_constant * self.earth_mass * vehicle_mass * position / orbital_radius**3
+        newtonian_force = (
+            -self.gravitational_constant
+            * self.earth_mass
+            * vehicle_mass
+            * position
+            / orbital_radius**3
+        )
 
         # J2 perturbation (oblateness)
         j_2 = 1.08263e-3  # Earth's J2 coefficient
         x, y, z = position
-        factor = (3 * j_2 * self.gravitational_constant * self.earth_mass * self.earth_radius**2) / (
-            2 * orbital_radius**5
-        )
+        factor = (
+            3
+            * j_2
+            * self.gravitational_constant
+            * self.earth_mass
+            * self.earth_radius**2
+        ) / (2 * orbital_radius**5)
         dx = factor * (5 * z**2 / orbital_radius**2 - 1) * x
         dy = factor * (5 * z**2 / orbital_radius**2 - 1) * y
         dz = factor * (5 * z**2 / orbital_radius**2 - 3) * z
@@ -63,7 +77,11 @@ class Environment:
         return sea_level_density * np.exp(-altitude / scale_height)
 
     def drag_force(
-        self, position: np.ndarray, velocity: np.ndarray, vehicle: Vehicle, quaternion: np.ndarray
+        self,
+        position: np.ndarray,
+        velocity: np.ndarray,
+        vehicle: Vehicle,
+        quaternion: np.ndarray,
     ) -> np.ndarray:
         """
         Compute aerodynamic drag force including angle-of-attack dependence.
@@ -100,7 +118,9 @@ class Environment:
 
         # Transform body frame Z axis to inertial frame
         body_frame_z_axis = np.array([0, 0, 1])
-        inertial_frame_z_axis = rotate_body_to_inertial_by_quat(body_frame_z_axis, quaternion)
+        inertial_frame_z_axis = rotate_body_to_inertial_by_quat(
+            body_frame_z_axis, quaternion
+        )
 
         # Compute angle of attack (radians)
         relative_vel_unit = relative_velocity / relative_velocity_magnitude
@@ -111,12 +131,17 @@ class Environment:
 
         # Adjust drag coefficient based on AoA
         total_drag_coefficient = (
-            vehicle.base_drag_coefficient + vehicle.drag_scaling_coefficient * np.sin(angle_of_attack) ** 2
+            vehicle.base_drag_coefficient
+            + vehicle.drag_scaling_coefficient * np.sin(angle_of_attack) ** 2
         )
 
         # Compute drag magnitude
         drag_magnitude = (
-            0.5 * density * relative_velocity_magnitude**2 * total_drag_coefficient * vehicle.cross_sectional_area
+            0.5
+            * density
+            * relative_velocity_magnitude**2
+            * total_drag_coefficient
+            * vehicle.cross_sectional_area
         )
 
         return drag_magnitude * drag_unit_vector
@@ -143,7 +168,7 @@ class Environment:
             Aerodynamic torque vector in body frame (N·m)
         """
         # Get control surface deflections
-        deflections = vehicle.get_grid_fin_deflections(time=None, state=None)
+        # deflections = vehicle.get_grid_fin_deflections(time=None, state=None)
 
         # TODO: Eventually add angle of attack math here for cross-sectional area
         return np.zeros(3)

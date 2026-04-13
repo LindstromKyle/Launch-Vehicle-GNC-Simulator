@@ -2,3 +2,24 @@
 *DS_Store*
 *.log
 archive/
+
+# Python bytecode and build outputs
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtual environment and local env files
+.venv/
+.env
+.env.local
+
+# Testing and tooling outputs
+.coverage
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+
+# Local Monte Carlo artifacts
+src/mc_results/*.json

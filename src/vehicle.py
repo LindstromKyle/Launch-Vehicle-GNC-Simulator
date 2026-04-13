@@ -1,6 +1,6 @@
-import numpy as np
+from abc import ABC, abstractmethod
 
-from abc import abstractmethod, ABC
+import numpy as np
 
 from utils import rotate_body_to_inertial_by_quat
 
@@ -44,7 +44,9 @@ class Vehicle(ABC):
         self.base_thrust_magnitude = base_thrust_magnitude
         self.average_isp = average_isp
         self.g0 = 9.80665
-        self.mdot_max = base_thrust_magnitude / (average_isp * self.g0) if average_isp > 0 else 0.0
+        self.mdot_max = (
+            base_thrust_magnitude / (average_isp * self.g0) if average_isp > 0 else 0.0
+        )
         self.moment_of_inertia = moment_of_inertia
         self.base_drag_coefficient = base_drag_coefficient
         self.drag_scaling_coefficient = drag_scaling_coefficient
@@ -64,7 +66,9 @@ class Vehicle(ABC):
         self._setup_propulsion_system()
 
     # TODO: This needs to live somewhere else
-    def get_grid_fin_deflections(self, time: float | None, state: np.ndarray | None) -> dict[str, float]:
+    def get_grid_fin_deflections(
+        self, time: float | None, state: np.ndarray | None
+    ) -> dict[str, float]:
         """
         Placeholder for future grid fin / control surface deflection logic.
 
@@ -100,7 +104,9 @@ class Vehicle(ABC):
         if propellant_mass <= 0:
             return self.dry_com_z
         total_mass = self.dry_mass + propellant_mass
-        com_z = (self.dry_mass * self.dry_com_z + propellant_mass * self.prop_com_z) / total_mass
+        com_z = (
+            self.dry_mass * self.dry_com_z + propellant_mass * self.prop_com_z
+        ) / total_mass
         return com_z
 
     def thrust_vector(
@@ -123,7 +129,9 @@ class Vehicle(ABC):
             Tuple of (total thrust force in inertial frame, total torque in body frame)
         """
         if len(gimbal_angles_list) != self.num_engines:
-            raise Exception(f"Expected {self.num_engines} gimbal angles but received {len(gimbal_angles_list)}")
+            raise Exception(
+                f"Expected {self.num_engines} gimbal angles but received {len(gimbal_angles_list)}"
+            )
 
         # Get dynamic gimbal arm based on propellant mass
         gimbal_arm = self.get_gimbal_arm(propellant_mass)
@@ -139,7 +147,11 @@ class Vehicle(ABC):
             )
             # Thrust direction in body frame
             body_thrust_direction = np.array(
-                [np.sin(gimbal_yaw), -np.sin(gimbal_pitch), np.cos(gimbal_pitch) * np.cos(gimbal_yaw)]
+                [
+                    np.sin(gimbal_yaw),
+                    -np.sin(gimbal_pitch),
+                    np.cos(gimbal_pitch) * np.cos(gimbal_yaw),
+                ]
             )
             body_thrust_direction /= np.linalg.norm(body_thrust_direction)
             # Effective thrust from throttle
@@ -168,7 +180,9 @@ class Vehicle(ABC):
         """
         return self.base_thrust_magnitude * max(min(throttle, 1.0), 0.0)
 
-    def rcs_vector(self, quaternion: np.ndarray, rcs_levels: list[float]) -> tuple[np.ndarray, np.ndarray]:
+    def rcs_vector(
+        self, quaternion: np.ndarray, rcs_levels: list[float]
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Compute total RCS force (inertial) and torque (body) from all thrusters.
 
@@ -210,10 +224,19 @@ class Falcon9FirstStage(Vehicle):
         pz = -self.engine_lever_arm
         angles = np.linspace(0, 2 * np.pi, 8, endpoint=False)
         outer_positions = [
-            np.array([self.engine_radius * np.cos(theta), self.engine_radius * np.sin(theta), pz]) for theta in angles
+            np.array(
+                [
+                    self.engine_radius * np.cos(theta),
+                    self.engine_radius * np.sin(theta),
+                    pz,
+                ]
+            )
+            for theta in angles
         ]
         center_position = np.array([0.0, 0.0, pz])
-        self.engines = [{"position": pos} for pos in outer_positions + [center_position]]
+        self.engines = [
+            {"position": pos} for pos in outer_positions + [center_position]
+        ]
 
 
 class Falcon9SecondStage(Vehicle):

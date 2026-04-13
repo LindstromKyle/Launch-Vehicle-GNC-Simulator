@@ -1,5 +1,4 @@
 import numpy as np
-
 from tqdm import tqdm
 
 from controller import Controller
@@ -56,7 +55,10 @@ def integrate_rk4(
     while current_time < t_final:
         # Log dynamic variables every [log_interval] seconds of simulation time
         log_flag = False
-        if last_logged_time is None or round(current_time - last_logged_time, 12) >= log_interval:
+        if (
+            last_logged_time is None
+            or round(current_time - last_logged_time, 12) >= log_interval
+        ):
             log_flag = True
             last_logged_time = current_time
 
@@ -169,7 +171,10 @@ def integrate_verlet(
 
     while current_time < t_final:
         # Logging
-        log_flag = last_logged_time is None or round(current_time - last_logged_time, 12) >= log_interval
+        log_flag = (
+            last_logged_time is None
+            or round(current_time - last_logged_time, 12) >= log_interval
+        )
         if log_flag:
             last_logged_time = current_time
 
@@ -181,13 +186,20 @@ def integrate_verlet(
 
         # Get desired quaternion and throttle from guidance
         guidance = mission_planner.current_phase
-        desired_quaternion, throttle = guidance.get_setpoints(current_time, current_state)
+        desired_quaternion, throttle = guidance.get_setpoints(
+            current_time, current_state
+        )
         desired_quaternion /= np.linalg.norm(desired_quaternion)
         attitude_mode = guidance.attitude_mode
 
         # Controller update
         controls = controller.update(
-            current_time, current_state, desired_quaternion, throttle, log_flag, attitude_mode
+            current_time,
+            current_state,
+            desired_quaternion,
+            throttle,
+            log_flag,
+            attitude_mode,
         )
 
         # Dynamics

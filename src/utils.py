@@ -1,12 +1,14 @@
-import numpy as np
 import warnings
 
+import numpy as np
 from scipy.spatial.transform import Rotation
 
 warnings.filterwarnings("error", category=RuntimeWarning)
 
 
-def rotate_body_to_inertial_by_quat(vector: np.ndarray, quaternion: np.ndarray) -> np.ndarray:
+def rotate_body_to_inertial_by_quat(
+    vector: np.ndarray, quaternion: np.ndarray
+) -> np.ndarray:
     """
     Rotate a vector from body frame to inertial frame using a quaternion.
 
@@ -23,7 +25,9 @@ def rotate_body_to_inertial_by_quat(vector: np.ndarray, quaternion: np.ndarray) 
     return np.round(rotation.apply(vector), 4)
 
 
-def compute_quaternion_derivative(quaternion: np.ndarray, angular_velocity: np.ndarray) -> np.ndarray:
+def compute_quaternion_derivative(
+    quaternion: np.ndarray, angular_velocity: np.ndarray
+) -> np.ndarray:
     """
     Compute time derivative of quaternion from angular velocity.
 
@@ -145,13 +149,14 @@ def compute_body_z_to_inertial_quat(desired_z_vector: np.ndarray) -> np.ndarray:
         return np.array([1.0, 0.0, 0.0, 0.0])  # Already aligned
     if abs(dot + 1.0) < 1e-6:
         # 180 degree rotation around arbitrary perpendicular axis
-        perp = np.array([1, 0, 0]) if abs(body_z_vector[0]) < 0.9 else np.array([0, 1, 0])
+        perp = (
+            np.array([1, 0, 0]) if abs(body_z_vector[0]) < 0.9 else np.array([0, 1, 0])
+        )
         cross = np.cross(body_z_vector, perp)
         cross /= np.linalg.norm(cross)
         return np.array([0.0, cross[0], cross[1], cross[2]])
 
     cross = np.cross(body_z_vector, desired_z_vector)
-    cross_norm = np.linalg.norm(cross)
     w = 1.0 + dot
     quat = np.array([w, cross[0], cross[1], cross[2]])
     quat /= np.linalg.norm(quat)
@@ -219,7 +224,10 @@ def compute_orbital_elements(
 
 
 def compute_time_to_apoapsis(
-    position: np.ndarray, velocity: np.ndarray, orbital_elements: dict, gravitational_parameter: float
+    position: np.ndarray,
+    velocity: np.ndarray,
+    orbital_elements: dict,
+    gravitational_parameter: float,
 ) -> float:
     """
     Compute time to next apoapsis for an elliptic orbit.
@@ -239,7 +247,9 @@ def compute_time_to_apoapsis(
     semi_major_axis = orbital_elements["semi_major_axis"]
 
     # True anomaly
-    cosine_true_anomaly = np.dot(eccentricity_vector, position) / (eccentricity * position_magnitude)
+    cosine_true_anomaly = np.dot(eccentricity_vector, position) / (
+        eccentricity * position_magnitude
+    )
     cosine_true_anomaly = np.clip(cosine_true_anomaly, -1.0, 1.0)
     true_anomaly_initial = np.arccos(cosine_true_anomaly)
     radial_velocity = np.dot(velocity, position) / position_magnitude
@@ -283,7 +293,9 @@ def compute_acceleration(t_vals: np.ndarray, velocity_vals: np.ndarray) -> np.nd
     return acceleration_vals
 
 
-def quaternion_from_attitude_mode(state_vector: np.ndarray, attitude_mode: str) -> np.ndarray:
+def quaternion_from_attitude_mode(
+    state_vector: np.ndarray, attitude_mode: str
+) -> np.ndarray:
 
     position = state_vector[:3]
     velocity = state_vector[3:6]
