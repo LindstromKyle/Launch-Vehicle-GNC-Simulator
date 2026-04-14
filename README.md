@@ -1,4 +1,7 @@
-# Rocket Ascent Simulator
+# Launch Vehicle GNC Simulator
+
+[![CI](https://github.com/LindstromKyle/Launch-Vehicle-GNC-Simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/LindstromKyle/Launch-Vehicle-GNC-Simulator/actions/workflows/ci.yml)
+[![Docker Build](https://github.com/LindstromKyle/Launch-Vehicle-GNC-Simulator/actions/workflows/docker-build.yml/badge.svg)](https://github.com/LindstromKyle/Launch-Vehicle-GNC-Simulator/actions/workflows/docker-build.yml)
 
 ![Banner](readme_imgs/earth.png)
 
@@ -10,11 +13,14 @@
 - [Key Achievements](#key-achievements)
 - [Technical Highlights](#technical-highlights)
 - [Results & Visualizations](#results--visualizations)
+- [FastAPI Endpoints](#fastapi-endpoints)
+- [Docker Containerization](#docker-containerization)
+- [CI Pipeline](#ci-pipeline)
 - [Future Extensions](#future-extensions)
 
 ## Overview
 
-This project is a modular, physics-based 6-DoF rocket ascent simulator that models the full flight from vertical liftoff through staging, vacuum guidance, coast, and orbital insertion. The simulation successfully reaches user-defined orbits (e.g. 275 × 290 km) using realistic control and guidance laws.
+This project is a modular, physics-based 6-DoF rocket ascent simulator that models the full flight from vertical liftoff through staging, vacuum guidance, coast, and orbital insertion. The simulation successfully reaches user-defined orbits (e.g. 275 × 290 km) using realistic control and guidance laws. It also includes production-oriented interfaces and workflows through a FastAPI service layer, Dockerized runtime, and CI validation pipeline.
 
 ## Key Achievements
 
@@ -22,7 +28,10 @@ This project is a modular, physics-based 6-DoF rocket ascent simulator that mode
 - Built modular mission planner with clean phase transitions (Initial Ascent → Pitch Program → PEG → Coast → Circularization)  
 - Achieved stable orbital insertion with tight apoapsis/periapsis tolerances under gravity, drag, and J2 perturbations  
 - Created quality 3D trajectory visualizations segmented by mission phase  
-- Maintained clean, object-oriented architecture suitable for extension (Monte Carlo, C++ port, Hardware-in-the-loop, etc.)
+- Maintained clean, object-oriented architecture suitable for extension (C++ port, Hardware-in-the-loop, etc.)
+- Exposed simulation execution via FastAPI endpoints, including health and Monte Carlo batch interfaces for programmatic use  
+- Added Docker and Docker Compose workflows for reproducible local and containerized deployment  
+- Established CI checks for formatting, linting, tests, and Docker build health to protect simulator reliability
 
 ## Technical Highlights
 
@@ -46,6 +55,11 @@ This project is a modular, physics-based 6-DoF rocket ascent simulator that mode
   - Phase objects (TimeBased, Kick, PEG, Coast, CircBurn, etc.)  
   - Automatic completion checks (time, apoapsis reached, eccentricity condition)  
   - Seamless hand-over between stages  
+
+- **Platform & Reliability**  
+  - FastAPI application layer with configuration-driven runtime settings and Monte Carlo execution endpoints  
+  - Dockerfile + Compose support for consistent environment setup and one-command service startup  
+  - CI pipeline enforcing Black, Ruff, Pytest, and container build validation on each change
 
 ## Results & Visualizations
 
@@ -81,9 +95,22 @@ This project is a modular, physics-based 6-DoF rocket ascent simulator that mode
 
 
 
-## API and Operations
+## FastAPI Endpoints
 
-The simulator now includes a FastAPI service and Monte Carlo batch endpoints.
+The simulator includes a FastAPI service and Monte Carlo batch endpoints.
+
+- Interactive docs (Swagger UI): `http://localhost:8000/docs`
+- Alternative docs (ReDoc): `http://localhost:8000/redoc`
+
+### Endpoint Summary
+
+| Method | Path | Purpose | Typical Status Codes |
+|---|---|---|---|
+| GET | `/health` | Service health and runtime environment | `200` |
+| POST | `/simulations/simulate` | Run one simulation request and return results | `200`, `422`, `500` |
+| POST | `/simulations/monte-carlo` | Kick off async Monte Carlo batch run | `200`, `422`, `500` |
+| GET | `/simulations/monte-carlo` | List Monte Carlo batches | `200`, `500` |
+| GET | `/simulations/monte-carlo/{batch_id}` | Poll a batch by id (returns `202` while in progress) | `200`, `202`, `404`, `500` |
 
 ### Local API Run
 
@@ -105,46 +132,90 @@ uvicorn app.main:app --app-dir src --host 0.0.0.0 --port 8000
 curl http://localhost:8000/health
 ```
 
+### Monte Carlo Example
+
+Kick off a batch (returns immediately with a `batch_id`):
+
+```bash
+curl -X POST http://localhost:8000/simulations/monte-carlo \
+  -H "Content-Type: application/json" \
+  -d '{
+    "num_simulations": 20,
+    "base_simulation": {},
+    "dispersions": {
+      "stage1_base_thrust_magnitude": {"mean": 7600000, "std_dev": 100000}
+    }
+  }'
+```
+
+Poll for completion:
+
+```bash
+curl http://localhost:8000/simulations/monte-carlo/<batch_id>
+```
+
+Note: Monte Carlo runs execute in the background via a thread pool. Polling can return `202` until the batch completes.
+
+## Docker Containerization
+
+The Docker image runs the FastAPI service with Uvicorn on port `8000` using Python `3.11-slim`.
+
 ### Environment Variables
 
 Create a `.env` file (or set variables directly) to customize runtime behavior:
 
 - `SIM_API_TITLE` (default: `6DOF Launch Simulator`)
-- `SIM_API_DESCRIPTION` (default: API description string)
+- `SIM_API_DESCRIPTION` (default: Configurable launch-to-orbit simulation for mission software testing)
 - `SIM_ENVIRONMENT` (default: `dev`)
 - `SIM_DEBUG` (default: `false`)
 - `SIM_EXECUTOR_MAX_WORKERS` (default: `4`)
 - `SIM_MONTE_CARLO_STORAGE_DIR` (default: `src/mc_results`)
 
-### Docker
+All variables are optional; defaults are defined in application settings.
 
-Build and run with Docker:
+### Local Development (Compose)
+
+Use Compose for local iteration with mounted Monte Carlo results:
+
+```bash
+docker compose up --build
+```
+
+This maps `./src/mc_results` to `/workdir/src/mc_results` in the container so Monte Carlo outputs persist locally.
+
+### Standalone Image Run
+
+Build and run a standalone image:
 
 ```bash
 docker build -t launch-gnc-sim .
 docker run --rm -p 8000:8000 --env-file .env launch-gnc-sim
 ```
 
-Or use compose:
+Use this mode for clean, reproducible runtime checks that mirror deployment behavior.
 
-```bash
-docker compose up --build
-```
+## CI Pipeline
 
-### Tests and CI
+Workflow pages:
 
-Run tests locally:
+- CI (format, lint, tests): https://github.com/LindstromKyle/Launch-Vehicle-GNC-Simulator/actions/workflows/ci.yml
+- Docker Build (image build/publish): https://github.com/LindstromKyle/Launch-Vehicle-GNC-Simulator/actions/workflows/docker-build.yml
 
-```bash
-PYTHONPATH=src pytest
-```
+### Triggers
 
-GitHub Actions now validates:
+- CI workflow runs on every `push`, `pull_request`, and manual dispatch.
+- Docker Build workflow runs on `push`/`pull_request` for Docker and source-related path changes, plus manual dispatch.
 
-- Linting via Ruff
-- Formatting via Black
-- Unit tests via Pytest
-- Docker image build health
+### What Gets Validated
+
+- Black formatting check (`black --check src tests`)
+- Ruff lint check (`ruff check src tests`)
+- Unit tests with Pytest (`PYTHONPATH=src pytest -v`)
+- Docker image build on GitHub Actions; image push to GHCR on `main`
+
+### Merge Gate
+
+Branch protection rule requires both workflows to pass before merge. This keeps style, correctness, and container buildability enforced on every change.
 
 
 ## Future Extensions
