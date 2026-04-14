@@ -220,7 +220,7 @@ Branch protection rule requires both workflows to pass before merge. This keeps 
 
 ## Future Extensions
 
-- Boost-back, re-entry, and landing burns with added control surfaces
+- Re-entry, descent, and landing with added control surfaces
 - C++/Rust performance port of dynamics & integration core  
 - Hardware-in-the-loop (HIL) interface layer  
 - Real-time visualization dashboard
