@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 import numpy as np
 
 from app.models.simulation_models import SimulationRequest
-from app.utils.simulation_runner import run_full_orbit_simulation
+from app.runners.simulation_runner import run_full_orbit_simulation
 
 
 class MonteCarloRunner:

@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from utils import compute_acceleration, quat_to_angle_axis
+from .utils import compute_acceleration, quat_to_angle_axis
 
 
 def plot_3D_integration_segments(

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from utils import rotate_body_to_inertial_by_quat
+from .utils import rotate_body_to_inertial_by_quat
 
 
 class Vehicle(ABC):

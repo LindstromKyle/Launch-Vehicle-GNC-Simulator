@@ -1,4 +1,18 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${SIM_DB_NAME:-launch_sim}
+      POSTGRES_USER: ${SIM_DB_USER:-sim_user}
+      POSTGRES_PASSWORD: ${SIM_DB_PASSWORD:-sim_password}
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${SIM_DB_USER:-sim_user} -d ${SIM_DB_NAME:-launch_sim}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   simulator-api:
     build:
       context: .
@@ -8,8 +22,16 @@ services:
       - .env
     environment:
       SIM_ENVIRONMENT: docker
-      SIM_MONTE_CARLO_STORAGE_DIR: /workdir/src/mc_results
+      SIM_DB_HOST: postgres
+      SIM_DB_PORT: 5432
+      SIM_DB_NAME: ${SIM_DB_NAME:-launch_sim}
+      SIM_DB_USER: ${SIM_DB_USER:-sim_user}
+      SIM_DB_PASSWORD: ${SIM_DB_PASSWORD:-sim_password}
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "8000:8000"
-    volumes:
-      - ./src/mc_results:/workdir/src/mc_results
+
+volumes:
+  postgres_data:

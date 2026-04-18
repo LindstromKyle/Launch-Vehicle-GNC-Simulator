@@ -12,6 +12,7 @@
 - [Overview](#overview)
 - [Key Achievements](#key-achievements)
 - [Technical Highlights](#technical-highlights)
+- [Repository Structure](#repository-structure)
 - [Results & Visualizations](#results--visualizations)
 - [FastAPI Endpoints](#fastapi-endpoints)
 - [Docker Containerization](#docker-containerization)
@@ -20,7 +21,7 @@
 
 ## Overview
 
-This project is a modular, physics-based 6-DoF rocket ascent simulator that models the full flight from vertical liftoff through staging, vacuum guidance, coast, and orbital insertion. The simulation successfully reaches user-defined orbits (e.g. 275 × 290 km) using realistic control and guidance laws. It also includes production-oriented interfaces and workflows through a FastAPI service layer, Dockerized runtime, and CI validation pipeline.
+This project is a modular, physics-based 6-DoF rocket ascent simulator that models the full flight from vertical liftoff through staging, vacuum guidance, coast, and orbital insertion. The simulation successfully reaches user-defined orbits (e.g. 275 × 290 km) using realistic control and guidance laws. It also includes production-oriented interfaces and workflows through a FastAPI service layer, a Docker Compose deployment with PostgreSQL-backed Monte Carlo persistence, and CI validation pipeline.
 
 ## Key Achievements
 
@@ -30,7 +31,7 @@ This project is a modular, physics-based 6-DoF rocket ascent simulator that mode
 - Created quality 3D trajectory visualizations segmented by mission phase  
 - Maintained clean, object-oriented architecture suitable for extension (C++ port, Hardware-in-the-loop, etc.)
 - Exposed simulation execution via FastAPI endpoints, including health and Monte Carlo batch interfaces for programmatic use  
-- Added Docker and Docker Compose workflows for reproducible local and containerized deployment  
+- Added Docker and Docker Compose workflows for reproducible local and containerized deployment with a dedicated Postgres service  
 - Established CI checks for formatting, linting, tests, and Docker build health to protect simulator reliability
 
 ## Technical Highlights
@@ -59,7 +60,22 @@ This project is a modular, physics-based 6-DoF rocket ascent simulator that mode
 - **Platform & Reliability**  
   - FastAPI application layer with configuration-driven runtime settings and Monte Carlo execution endpoints  
   - Dockerfile + Compose support for consistent environment setup and one-command service startup  
+  - PostgreSQL-backed Monte Carlo persistence using a dedicated container and Docker volume  
   - CI pipeline enforcing Black, Ruff, Pytest, and container build validation on each change
+
+## Repository Structure
+
+The repository is split between the simulation engine and the application layer.
+
+- `src/simulator/` contains the core physics and mission code: dynamics, environment, guidance, controller, integrator, state, plotting, vehicle models, and the simulator driver.
+- `src/app/paths/` contains FastAPI route definitions and API-facing orchestration.
+- `src/app/models/` contains Pydantic request/response models.
+- `src/app/runners/` contains application runners that translate API requests into simulator executions and Monte Carlo workflows.
+- `src/app/storage/` contains persistence logic, currently PostgreSQL-backed Monte Carlo batch storage.
+- `examples/` contains standalone scripts that exercise the simulator package directly.
+- `tests/` validates the simulator package and API-adjacent behavior.
+
+This separation keeps the simulation engine reusable while the FastAPI layer owns delivery concerns such as request handling, persistence, and batch orchestration.
 
 ## Results & Visualizations
 
@@ -169,19 +185,23 @@ Create a `.env` file (or set variables directly) to customize runtime behavior:
 - `SIM_ENVIRONMENT` (default: `dev`)
 - `SIM_DEBUG` (default: `false`)
 - `SIM_EXECUTOR_MAX_WORKERS` (default: `4`)
-- `SIM_MONTE_CARLO_STORAGE_DIR` (default: `src/mc_results`)
+- `SIM_DB_HOST` (default: `localhost`)
+- `SIM_DB_PORT` (default: `5432`)
+- `SIM_DB_NAME` (default: `launch_sim`)
+- `SIM_DB_USER` (default: `sim_user`)
+- `SIM_DB_PASSWORD` (default: `sim_password`)
 
 All variables are optional; defaults are defined in application settings.
 
 ### Local Development (Compose)
 
-Use Compose for local iteration with mounted Monte Carlo results:
+Use Compose for local iteration with the API and PostgreSQL running as separate services:
 
 ```bash
 docker compose up --build
 ```
 
-This maps `./src/mc_results` to `/workdir/src/mc_results` in the container so Monte Carlo outputs persist locally.
+Compose provisions a named Postgres volume for Monte Carlo persistence so results survive container restarts.
 
 ### Standalone Image Run
 

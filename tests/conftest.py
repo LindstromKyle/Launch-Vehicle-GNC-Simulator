@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from environment import Environment
-from vehicle import Vehicle
+from simulator.environment import Environment
+from simulator.vehicle import Vehicle
 
 
 @pytest.fixture

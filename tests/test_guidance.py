@@ -1,7 +1,7 @@
 import numpy as np
 
-from guidance import TimeBasedGuidancePhase
-from utils import compute_body_z_to_inertial_quat
+from simulator.guidance import TimeBasedGuidancePhase
+from simulator.utils import compute_body_z_to_inertial_quat
 
 
 def test_get_desired_quaternion_prograde():

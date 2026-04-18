@@ -1,24 +1,24 @@
 import numpy as np
 
 from app.models.simulation_models import SimResults, SimulationRequest
-from controller import PIDAttitudeController
-from environment import Environment
-from guidance import (
+from simulator.controller import PIDAttitudeController
+from simulator.environment import Environment
+from simulator.guidance import (
     CircBurnGuidancePhase,
     CoastGuidancePhase,
     PEGGuidancePhase,
     ProgrammedPitchGuidancePhase,
     TimeBasedGuidancePhase,
 )
-from mission import MissionPlanner
-from simulator import Simulator
-from state import State
-from utils import (
+from simulator.mission import MissionPlanner
+from simulator.simulator import Simulator
+from simulator.state import State
+from simulator.utils import (
     compute_body_z_to_inertial_quat,
     compute_orbital_elements,
     rotate_body_to_inertial_by_quat,
 )
-from vehicle import Falcon9FirstStage, Falcon9SecondStage
+from simulator.vehicle import Falcon9FirstStage, Falcon9SecondStage
 
 
 def run_full_orbit_simulation(request: SimulationRequest) -> dict:

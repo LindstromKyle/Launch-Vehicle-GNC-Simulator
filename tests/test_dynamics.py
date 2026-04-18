@@ -1,6 +1,6 @@
 import numpy as np
 
-from dynamics import calculate_dynamics
+from simulator.dynamics import calculate_dynamics
 
 
 def test_calculate_dynamics_gravity_only(basic_environment, basic_vehicle):

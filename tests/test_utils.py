@@ -1,6 +1,6 @@
 import numpy as np
 
-from utils import (
+from simulator.utils import (
     compute_orbital_elements,
     compute_time_to_apoapsis,
     quat_to_angle_axis,

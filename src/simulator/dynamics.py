@@ -3,9 +3,9 @@ import warnings
 
 import numpy as np
 
-from environment import Environment
-from utils import compute_quaternion_derivative
-from vehicle import Vehicle
+from .environment import Environment
+from .utils import compute_quaternion_derivative
+from .vehicle import Vehicle
 
 warnings.filterwarnings("error", category=RuntimeWarning)
 

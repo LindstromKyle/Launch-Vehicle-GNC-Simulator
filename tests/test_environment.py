@@ -1,6 +1,6 @@
 import numpy as np
 
-from environment import Environment
+from simulator.environment import Environment
 
 
 def test_gravitational_force_surface(basic_environment):

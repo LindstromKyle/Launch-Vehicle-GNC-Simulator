@@ -12,9 +12,9 @@ from app.models.simulation_models import (
     SimulationResponse,
 )
 from app.settings import get_settings
-from app.utils.monte_carlo_runner import MonteCarloRunner
-from app.utils.monte_carlo_storage import MonteCarloStorage
-from app.utils.simulation_runner import run_full_orbit_simulation
+from app.runners.monte_carlo_runner import MonteCarloRunner
+from app.runners.simulation_runner import run_full_orbit_simulation
+from app.storage.monte_carlo_storage import get_monte_carlo_storage
 
 settings = get_settings()
 
@@ -22,7 +22,7 @@ settings = get_settings()
 executor = ThreadPoolExecutor(max_workers=settings.simulator_executor_max_workers)
 
 # Initialize Monte Carlo storage and service
-mc_storage = MonteCarloStorage()
+mc_storage = get_monte_carlo_storage()
 mc_runner = MonteCarloRunner()
 
 sim_router = APIRouter(prefix="/simulations", tags=["Simulations"])
@@ -121,11 +121,11 @@ def _run_monte_carlo_background(batch_id: str, request: MonteCarloRequest):
 
     except Exception as e:
         error_msg = f"Background MC batch failed: {str(e)}"
-        batch_data = mc_storage.get_batch(batch_id)
-        batch_data["simulations"] = results
-        batch_data["status"] = "failed"
-        batch_data["summary"] = {"error": error_msg}
-        mc_storage._save_batch(batch_id, batch_data)
+        mc_storage.mark_batch_failed(
+            batch_id=batch_id,
+            simulations=results,
+            error_msg=error_msg,
+        )
 
 
 @sim_router.get("/monte-carlo/{batch_id}", response_model=MonteCarloBatchResponse)

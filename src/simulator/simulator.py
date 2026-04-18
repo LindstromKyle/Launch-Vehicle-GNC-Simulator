@@ -3,12 +3,12 @@ from pathlib import Path
 
 import numpy as np
 
-from controller import Controller
-from environment import Environment
-from integrator import integrate_verlet
-from mission import MissionPlanner
-from state import State
-from vehicle import Vehicle
+from .controller import Controller
+from .environment import Environment
+from .integrator import integrate_verlet
+from .mission import MissionPlanner
+from .state import State
+from .vehicle import Vehicle
 
 
 class Simulator:
@@ -72,7 +72,7 @@ class Simulator:
         """
 
         # Ensure the logs directory exists (creates it if missing, including any parent folders)
-        log_dir = Path(__file__).parent.parent / "logs"
+        log_dir = Path(__file__).resolve().parents[2] / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         logfile = log_dir / f"{self.log_name}.log"
 

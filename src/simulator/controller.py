@@ -4,13 +4,13 @@ from abc import ABC, abstractmethod
 import numpy as np
 from scipy.optimize import nnls
 
-from utils import (
+from .utils import (
     quat_to_angle_axis,
     quaternion_inverse,
     quaternion_multiply,
     rotate_body_to_inertial_by_quat,
 )
-from vehicle import Vehicle
+from .vehicle import Vehicle
 
 
 class Controller(ABC):

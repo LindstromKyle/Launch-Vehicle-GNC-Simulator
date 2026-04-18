@@ -1,20 +1,23 @@
 import numpy as np
 
-from controller import PIDAttitudeController
-from environment import Environment
-from guidance import (
+from simulator.controller import PIDAttitudeController
+from simulator.environment import Environment
+from simulator.guidance import (
     CircBurnGuidancePhase,
     CoastGuidancePhase,
     PEGGuidancePhase,
     ProgrammedPitchGuidancePhase,
     TimeBasedGuidancePhase,
 )
-from mission import MissionPlanner
-from plotting import plot_3D_integration_segments
-from simulator import Simulator
-from state import State
-from utils import compute_body_z_to_inertial_quat, rotate_body_to_inertial_by_quat
-from vehicle import Falcon9FirstStage, Falcon9SecondStage
+from simulator.mission import MissionPlanner
+from simulator.plotting import plot_3D_integration_segments
+from simulator.simulator import Simulator
+from simulator.state import State
+from simulator.utils import (
+    compute_body_z_to_inertial_quat,
+    rotate_body_to_inertial_by_quat,
+)
+from simulator.vehicle import Falcon9FirstStage, Falcon9SecondStage
 
 # Stage 1
 stage1_dry_mass = 25600

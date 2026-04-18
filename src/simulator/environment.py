@@ -1,7 +1,7 @@
 import numpy as np
 
-from utils import rotate_body_to_inertial_by_quat
-from vehicle import Vehicle
+from .utils import rotate_body_to_inertial_by_quat
+from .vehicle import Vehicle
 
 
 class Environment:

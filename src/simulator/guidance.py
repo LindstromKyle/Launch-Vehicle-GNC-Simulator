@@ -4,14 +4,14 @@ from typing import Tuple
 
 import numpy as np
 
-from environment import Environment
-from utils import (
+from .environment import Environment
+from .utils import (
     compute_body_z_to_inertial_quat,
     compute_orbital_elements,
     compute_time_to_apoapsis,
     quaternion_from_attitude_mode,
 )
-from vehicle import Vehicle
+from .vehicle import Vehicle
 
 
 class GuidancePhase(ABC):

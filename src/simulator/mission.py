@@ -2,10 +2,10 @@ import logging
 
 import numpy as np
 
-from environment import Environment
-from guidance import GuidancePhase
-from utils import compute_orbital_elements
-from vehicle import Vehicle
+from .environment import Environment
+from .guidance import GuidancePhase
+from .utils import compute_orbital_elements
+from .vehicle import Vehicle
 
 
 class MissionPlanner:
