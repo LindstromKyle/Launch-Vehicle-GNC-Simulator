@@ -5,8 +5,6 @@
 
 ![Banner](readme_imgs/earth.png)
 
-*A complete Python-based 6-DoF simulation of a two-stage launch vehicle from liftoff to stable low Earth orbit.*
-
 ## Table of Contents
 
 - [Overview](#overview)
@@ -14,14 +12,18 @@
 - [Technical Highlights](#technical-highlights)
 - [Repository Structure](#repository-structure)
 - [Results & Visualizations](#results--visualizations)
-- [FastAPI Endpoints](#fastapi-endpoints)
-- [Docker Containerization](#docker-containerization)
-- [CI Pipeline](#ci-pipeline)
+- [Mission Software Platform](#mission-software-platform)
+- [API Reference](#api-reference)
+- [Deployment & Operations](#deployment--operations)
 - [Future Extensions](#future-extensions)
 
 ## Overview
 
-This project is a modular, physics-based 6-DoF rocket ascent simulator that models the full flight from vertical liftoff through staging, vacuum guidance, coast, and orbital insertion. The simulation successfully reaches user-defined orbits (e.g. 275 × 290 km) using realistic control and guidance laws. It also includes production-oriented interfaces and workflows through a FastAPI service layer, a Docker Compose deployment with PostgreSQL-backed Monte Carlo persistence, and CI validation pipeline.
+This project is a modular, physics-based 6-DoF rocket ascent simulator that models the full flight from vertical liftoff through staging, vacuum guidance, coast, and orbital insertion. The simulation successfully reaches user-defined orbits (e.g. 275 × 290 km) using realistic control and guidance laws. The simulation engine is backed by a production-style mission software platform: a FastAPI service with live WebSocket telemetry streaming, async Monte Carlo dispersion analysis with PostgreSQL persistence, a browser-based operator dashboard, containerized deployment via Docker Compose, and CI validation on every change.  
+
+<br>
+
+![Telemetry](readme_imgs/live_telemetry.gif)
 
 ## Key Achievements
 
@@ -30,7 +32,7 @@ This project is a modular, physics-based 6-DoF rocket ascent simulator that mode
 - Achieved stable orbital insertion with tight apoapsis/periapsis tolerances under gravity, drag, and J2 perturbations  
 - Created quality 3D trajectory visualizations segmented by mission phase  
 - Maintained clean, object-oriented architecture suitable for extension (C++ port, Hardware-in-the-loop, etc.)
-- Exposed simulation execution via FastAPI endpoints, including health and Monte Carlo batch interfaces for programmatic use  
+- Exposed simulation execution via a full FastAPI service layer: synchronous single-run endpoint, async live telemetry endpoint with WebSocket frame streaming and a browser dashboard, and async Monte Carlo batch endpoint with PostgreSQL-persisted results  
 - Added Docker and Docker Compose workflows for reproducible local and containerized deployment with a dedicated Postgres service  
 - Established CI checks for formatting, linting, tests, and Docker build health to protect simulator reliability
 
@@ -57,10 +59,11 @@ This project is a modular, physics-based 6-DoF rocket ascent simulator that mode
   - Automatic completion checks (time, apoapsis reached, eccentricity condition)  
   - Seamless hand-over between stages  
 
-- **Platform & Reliability**  
-  - FastAPI application layer with configuration-driven runtime settings and Monte Carlo execution endpoints  
-  - Dockerfile + Compose support for consistent environment setup and one-command service startup  
-  - PostgreSQL-backed Monte Carlo persistence using a dedicated container and Docker volume  
+- **Mission Software Platform**  
+  - FastAPI application layer with environment-driven configuration and three route groups: single-run simulation, live telemetry, and Monte Carlo  
+  - WebSocket telemetry stream with sequenced frames and a browser dashboard (Chart.js altitude/speed charts + Plotly 3D orbit view)  
+  - Async background execution using a shared thread pool; live telemetry tracked with a thread-safe in-memory state machine (`queued → running → completed/failed`)  
+  - PostgreSQL-backed Monte Carlo batch persistence with schema auto-initialization and named Docker volume  
   - CI pipeline enforcing Black, Ruff, Pytest, and container build validation on each change
 
 ## Repository Structure
@@ -71,7 +74,8 @@ The repository is split between the simulation engine and the application layer.
 - `src/app/paths/` contains FastAPI route definitions and API-facing orchestration.
 - `src/app/models/` contains Pydantic request/response models.
 - `src/app/runners/` contains application runners that translate API requests into simulator executions and Monte Carlo workflows.
-- `src/app/storage/` contains persistence logic, currently PostgreSQL-backed Monte Carlo batch storage.
+- `src/app/storage/` contains two persistence implementations: PostgreSQL-backed Monte Carlo batch storage and a thread-safe in-memory store for live telemetry runs.
+- `src/app/frontend/live/` contains the browser-based live telemetry dashboard (HTML/CSS/JS using Chart.js and Plotly, served directly by FastAPI).
 - `examples/` contains standalone scripts that exercise the simulator package directly.
 - `tests/` validates the simulator package and API-adjacent behavior.
 
@@ -111,27 +115,27 @@ This separation keeps the simulation engine reusable while the FastAPI layer own
 
 
 
-## FastAPI Endpoints
+## Mission Software Platform
 
-The simulator includes a FastAPI service and Monte Carlo batch endpoints.
+The physics core is packaged behind a production-style mission software interface built for repeatable operations and automation.
 
-- Interactive docs (Swagger UI): `http://localhost:8000/docs`
-- Alternative docs (ReDoc): `http://localhost:8000/redoc`
+### Backend Highlights
 
-### Endpoint Summary
+- Exposes deterministic simulation execution through typed request/response contracts.
+- Separates heavy compute from API request handling using a shared thread pool.
+- Supports both human-in-the-loop workflows (live telemetry UI) and machine-driven workflows (batch Monte Carlo).
+- Persists batch analysis artifacts to PostgreSQL for traceability and post-run analysis.
+- Runs consistently in local development, Docker Compose, and CI.
 
-| Method | Path | Purpose | Typical Status Codes |
-|---|---|---|---|
-| GET | `/health` | Service health and runtime environment | `200` |
-| POST | `/simulations/simulate` | Run one simulation request and return results | `200`, `422`, `500` |
-| GET | `/simulations/live/view` | Minimal browser UI to start/connect and view live telemetry text | `200` |
-| POST | `/simulations/live/start` | Kick off async simulation run with live telemetry stream | `200`, `422`, `500` |
-| WS | `/simulations/live/{run_id}/ws` | WebSocket stream of telemetry frames and final status | `101`, `404` |
-| POST | `/simulations/monte-carlo` | Kick off async Monte Carlo batch run | `200`, `422`, `500` |
-| GET | `/simulations/monte-carlo` | List Monte Carlo batches | `200`, `500` |
-| GET | `/simulations/monte-carlo/{batch_id}` | Poll a batch by id (returns `202` while in progress) | `200`, `202`, `404`, `500` |
+### Service architecture
 
-### Local API Run
+- FastAPI app with three route groups under `/simulations`: single-run simulation, live telemetry, and Monte Carlo.
+- Shared background executor configured by `SIM_SIMULATOR_EXECUTOR_MAX_WORKERS`.
+- Live telemetry store is in-memory and thread-safe (`queued -> running -> completed/failed`).
+- Monte Carlo storage is PostgreSQL-backed and initializes schema on startup.
+- Runtime configuration is environment-driven using `pydantic-settings` with `SIM_` prefix.
+
+### Local API run
 
 1. Install dependencies:
 
@@ -151,9 +155,77 @@ uvicorn app.main:app --app-dir src --host 0.0.0.0 --port 8000
 curl http://localhost:8000/health
 ```
 
-### Monte Carlo Example
+4. Open docs:
 
-Kick off a batch (returns immediately with a `batch_id`):
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+
+## API Reference
+
+### Endpoint summary
+
+| Method | Path | Purpose | Typical status codes |
+|---|---|---|---|
+| GET | `/health` | Health + runtime environment | `200` |
+| POST | `/simulations/simulate` | Run one 6-DoF simulation request | `200`, `422`, `500` |
+| GET | `/simulations/live/view` | Browser UI for live telemetry | `200` |
+| GET | `/simulations/live/assets/styles.css` | Live UI stylesheet | `200` |
+| GET | `/simulations/live/assets/app.js` | Live UI JavaScript | `200` |
+| POST | `/simulations/live/start` | Start async simulation run and return `run_id` | `200`, `422`, `500` |
+| WS | `/simulations/live/{run_id}/ws` | Stream telemetry frames + terminal status | `101`, `404` |
+| POST | `/simulations/monte-carlo` | Start async Monte Carlo batch and return `batch_id` | `200`, `422`, `500` |
+| GET | `/simulations/monte-carlo` | List Monte Carlo batches | `200`, `500` |
+| GET | `/simulations/monte-carlo/{batch_id}` | Poll batch status/results | `200`, `202`, `404`, `500` |
+
+### Canonical response behavior
+
+- `POST /simulations/simulate` returns:
+  - `message`
+  - `summary` containing key orbit metrics (`final_altitude_km`, `apoapsis_altitude_km`, `periapsis_altitude_km`, `eccentricity`, etc.)
+  - `full_data` only when `sim_results=full`
+- `POST /simulations/live/start` returns immediately and executes the simulation in background.
+- Live WebSocket emits:
+  - `{"type": "telemetry", "data": ...}` while running
+  - one final `{"type": "status", "data": ...}` when finished or failed
+- `GET /simulations/monte-carlo/{batch_id}` returns `202` while a batch is still running.
+
+### Example: single simulation
+
+```bash
+curl -X POST http://localhost:8000/simulations/simulate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "target_apo_alt_km": 300,
+    "target_peri_alt_km": 200,
+    "sim_results": "orbital_elements_only"
+  }'
+```
+
+### Example: live telemetry flow
+
+Start run:
+
+```bash
+curl -X POST "http://localhost:8000/simulations/live/start?telemetry_interval=0.5" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+Connect to stream:
+
+```text
+ws://localhost:8000/simulations/live/<run_id>/ws
+```
+
+Browser telemetry dashboard:
+
+```text
+http://localhost:8000/simulations/live/view
+```
+
+### Example: Monte Carlo batch
+
+Kick off:
 
 ```bash
 curl -X POST http://localhost:8000/simulations/monte-carlo \
@@ -162,109 +234,67 @@ curl -X POST http://localhost:8000/simulations/monte-carlo \
     "num_simulations": 20,
     "base_simulation": {},
     "dispersions": {
-      "stage1_base_thrust_magnitude": {"mean": 7600000, "std_dev": 100000}
+      "stage1_base_thrust_magnitude": {"mean": 7600000, "std_dev": 100000},
+      "stage1_initial_prop_mass": {"mean": 395700, "std_dev": 5000}
     }
   }'
 ```
 
-Poll for completion:
+Poll batch:
 
 ```bash
 curl http://localhost:8000/simulations/monte-carlo/<batch_id>
 ```
 
-Note: Monte Carlo runs execute in the background via a thread pool. Polling can return `202` until the batch completes.
+The returned statistics include distribution summaries (mean/std/min/max/p5/p95) for altitude/eccentricity plus failure-mode aggregation.
 
-### Live Telemetry Example
+## Deployment & Operations
 
-Browser viewer page:
+### Environment variables
 
-```text
-http://localhost:8000/simulations/live/view
-```
-
-The page can start a new live run and stream telemetry in plain text directly in the browser.
-
-Start a live run (returns immediately with a `run_id`):
-
-```bash
-curl -X POST "http://localhost:8000/simulations/live/start?telemetry_interval=0.5" \
-  -H "Content-Type: application/json" \
-  -d '{}'
-```
-
-WebSocket stream URL:
-
-```text
-ws://localhost:8000/simulations/live/<run_id>/ws
-```
-
-The socket sends telemetry messages with `type=telemetry` while running and one final `type=status` payload on completion or failure.
-
-## Docker Containerization
-
-The Docker image runs the FastAPI service with Uvicorn on port `8000` using Python `3.11-slim`.
-
-### Environment Variables
-
-Create a `.env` file (or set variables directly) to customize runtime behavior:
+All runtime settings are optional and read from `.env` (or process env) with prefix `SIM_`:
 
 - `SIM_API_TITLE` (default: `6DOF Launch Simulator`)
-- `SIM_API_DESCRIPTION` (default: Configurable launch-to-orbit simulation for mission software testing)
+- `SIM_API_DESCRIPTION` (default: `Configurable launch-to-orbit simulation for mission software testing`)
 - `SIM_ENVIRONMENT` (default: `dev`)
 - `SIM_DEBUG` (default: `false`)
-- `SIM_EXECUTOR_MAX_WORKERS` (default: `4`)
+- `SIM_SIMULATOR_EXECUTOR_MAX_WORKERS` (default: `4`)
 - `SIM_DB_HOST` (default: `localhost`)
 - `SIM_DB_PORT` (default: `5432`)
 - `SIM_DB_NAME` (default: `launch_sim`)
 - `SIM_DB_USER` (default: `sim_user`)
 - `SIM_DB_PASSWORD` (default: `sim_password`)
 
-All variables are optional; defaults are defined in application settings.
+### Docker and Compose
 
-### Local Development (Compose)
-
-Use Compose for local iteration with the API and PostgreSQL running as separate services:
+Compose runs API + PostgreSQL with dependency health checks and a persistent named volume:
 
 ```bash
 docker compose up --build
 ```
 
-Compose provisions a named Postgres volume for Monte Carlo persistence so results survive container restarts.
-
-### Standalone Image Run
-
-Build and run a standalone image:
+Standalone container workflow:
 
 ```bash
 docker build -t launch-gnc-sim .
 docker run --rm -p 8000:8000 --env-file .env launch-gnc-sim
 ```
 
-Use this mode for clean, reproducible runtime checks that mirror deployment behavior.
-
-## CI Pipeline
+### CI pipeline
 
 Workflow pages:
 
 - CI (format, lint, tests): https://github.com/LindstromKyle/Launch-Vehicle-GNC-Simulator/actions/workflows/ci.yml
 - Docker Build (image build/publish): https://github.com/LindstromKyle/Launch-Vehicle-GNC-Simulator/actions/workflows/docker-build.yml
 
-### Triggers
-
-- CI workflow runs on every `push`, `pull_request`, and manual dispatch.
-- Docker Build workflow runs on `push`/`pull_request` for Docker and source-related path changes, plus manual dispatch.
-
-### What Gets Validated
+Validation gates:
 
 - Black formatting check (`black --check src tests`)
 - Ruff lint check (`ruff check src tests`)
 - Unit tests with Pytest (`PYTHONPATH=src pytest -v`)
 - Docker image build on GitHub Actions; image push to GHCR on `main`
 
-### Merge Gate
-
-Branch protection rule requires both workflows to pass before merge. This keeps style, correctness, and container buildability enforced on every change.
+Branch protection requires CI + Docker workflows to pass before merge.
 
 
 ## Future Extensions
@@ -272,4 +302,3 @@ Branch protection rule requires both workflows to pass before merge. This keeps 
 - Re-entry, descent, and landing with added control surfaces
 - C++/Rust performance port of dynamics & integration core  
 - Hardware-in-the-loop (HIL) interface layer  
-- Real-time visualization dashboard

@@ -7,14 +7,14 @@ from typing import Any, Dict, List
 
 import psycopg
 
-from app.settings import get_settings
+from app.settings import Settings
 
 
 class MonteCarloStorage:
     """Persists Monte Carlo batches in PostgreSQL using direct SQL."""
 
     def __init__(self):
-        settings = get_settings()
+        settings = Settings()
         self._connection_string = settings.db_connection_string
         self._initialize_schema()
 
@@ -194,7 +194,3 @@ class MonteCarloStorage:
             }
             for row in rows
         ]
-
-
-def get_monte_carlo_storage() -> MonteCarloStorage:
-    return MonteCarloStorage()

@@ -3,9 +3,9 @@ from fastapi import FastAPI
 from app.paths.live import live_router
 from app.paths.monte_carlo import monte_carlo_router
 from app.paths.simulation import simulation_router
-from app.settings import get_settings
+from app.settings import Settings
 
-settings = get_settings()
+settings = Settings()
 
 app = FastAPI(
     title=settings.api_title,
