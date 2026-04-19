@@ -1,3 +1,5 @@
+from typing import Any, Callable
+
 import numpy as np
 
 from app.models.simulation_models import SimResults, SimulationRequest
@@ -21,12 +23,18 @@ from simulator.utils import (
 from simulator.vehicle import Falcon9FirstStage, Falcon9SecondStage
 
 
-def run_full_orbit_simulation(request: SimulationRequest) -> dict:
+def run_full_orbit_simulation(
+    request: SimulationRequest,
+    telemetry_callback: Callable[[dict[str, Any]], None] | None = None,
+    telemetry_interval: float | None = None,
+) -> dict:
     """
     Runs the two-stage orbital simulation, configurable via request.
 
     Args:
         request: The SimulationRequest model
+        telemetry_callback: Optional callback to receive live telemetry frames
+        telemetry_interval: Minimum seconds between emitted telemetry frames
 
     Returns:
         Dictionary with final sim results
@@ -120,7 +128,10 @@ def run_full_orbit_simulation(request: SimulationRequest) -> dict:
         log_name="api_stage1",
     )
     sim1.add_controller(controller1)
-    stage1_t, stage1_state, stage1_trans = sim1.run()
+    stage1_t, stage1_state, stage1_trans = sim1.run(
+        telemetry_callback=telemetry_callback,
+        telemetry_interval=telemetry_interval,
+    )
 
     # ==================== STAGE 2 ====================
     burnout_vec = stage1_state[-1]
@@ -218,7 +229,10 @@ def run_full_orbit_simulation(request: SimulationRequest) -> dict:
         log_name="api_stage2",
     )
     sim2.add_controller(controller2)
-    stage2_t, stage2_state, stage2_trans = sim2.run()
+    stage2_t, stage2_state, stage2_trans = sim2.run(
+        telemetry_callback=telemetry_callback,
+        telemetry_interval=telemetry_interval,
+    )
 
     # Combine results (your existing logic)
     all_t = np.append(stage1_t, stage2_t)

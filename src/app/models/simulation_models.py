@@ -158,3 +158,9 @@ class MonteCarloKickoffResponse(BaseModel):
     created_at: str
     status: str
     total_simulations: int
+
+
+class LiveSimulationStartResponse(BaseModel):
+    run_id: str
+    status: str
+    created_at: str

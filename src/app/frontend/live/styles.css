@@ -1,0 +1,242 @@
+:root {
+    --bg: #0a1222;
+    --panel: #121e36;
+    --line: #274068;
+    --text: #dce8ff;
+    --muted: #96acd8;
+    --accent: #66d6ff;
+    --ok: #78f0b2;
+    --warn: #ffc47c;
+    --err: #ff8d8d;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: "Consolas", "Cascadia Mono", "Liberation Mono", monospace;
+    color: var(--text);
+    background:
+        radial-gradient(circle at 15% 10%, #1d2f59 0%, transparent 44%),
+        radial-gradient(circle at 78% 0%, #12546d 0%, transparent 30%),
+        var(--bg);
+    min-height: 100vh;
+    padding: 24px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.title {
+    margin: 0;
+    font-size: 30px;
+    letter-spacing: 0.03em;
+}
+
+.subtitle {
+    margin: 8px 0 18px;
+    color: var(--muted);
+}
+
+.controls {
+    display: grid;
+    grid-template-columns: 1.4fr 0.7fr repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+input,
+button {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: #0f1a32;
+    color: var(--text);
+    padding: 10px 12px;
+    font: inherit;
+}
+
+button {
+    background: linear-gradient(180deg, #234272 0%, #1a3359 100%);
+    cursor: pointer;
+}
+
+button:hover {
+    border-color: var(--accent);
+}
+
+.kpis {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.kpi {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: var(--panel);
+    min-height: 78px;
+    max-height: 78px;
+    overflow: hidden;
+}
+
+.kpi-label {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.kpi-value {
+    margin-top: 4px;
+    font-size: 18px;
+    color: var(--ok);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.charts .panel {
+    height: 340px;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.chart-wrap canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.panel {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #0e1830;
+    padding: 12px;
+}
+
+.panel h2 {
+    margin: 0 0 10px;
+    font-size: 16px;
+}
+
+.phase-panel {
+    margin-bottom: 12px;
+}
+
+.orbit-panel {
+    margin-bottom: 12px;
+}
+
+.orbit-plot {
+    width: 100%;
+    height: 460px;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    display: block;
+    color: var(--muted);
+    border: 1px solid rgba(39, 64, 104, 0.55);
+    background: #0b152c;
+}
+
+.orbit-placeholder {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    text-align: center;
+    padding: 16px;
+    line-height: 1.45;
+}
+
+.orbit-placeholder.error {
+    color: var(--err);
+}
+
+.phase-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 34px;
+}
+
+.phase-chip {
+    border: 1px solid #35639d;
+    border-radius: 999px;
+    padding: 4px 10px;
+    color: #cce1ff;
+    background: #153359;
+    font-size: 12px;
+}
+
+.phase-chip.active {
+    border-color: #7dd3fc;
+    background: #1e4e7d;
+}
+
+.log {
+    height: 300px;
+    overflow: auto;
+    white-space: pre-wrap;
+    line-height: 1.35;
+    font-size: 12px;
+}
+
+.line-telemetry {
+    color: #d1e4ff;
+}
+
+.line-status {
+    color: var(--ok);
+}
+
+.line-error {
+    color: var(--err);
+}
+
+@media (max-width: 1050px) {
+    .controls {
+        grid-template-columns: 1fr 1fr 1fr;
+    }
+
+    .kpis,
+    .charts {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 760px) {
+
+    .controls,
+    .kpis,
+    .charts {
+        grid-template-columns: 1fr;
+    }
+
+    .orbit-plot {
+        height: 340px;
+    }
+}

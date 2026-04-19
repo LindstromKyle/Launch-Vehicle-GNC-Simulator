@@ -1,3 +1,5 @@
+from typing import Any, Callable
+
 import numpy as np
 from tqdm import tqdm
 
@@ -19,6 +21,8 @@ def integrate_rk4(
     log_interval: float,
     controller: Controller,
     mission_planner: MissionPlanner,
+    telemetry_callback: Callable[[dict[str, Any]], None] | None = None,
+    telemetry_interval: float | None = None,
 ) -> tuple[np.ndarray, np.ndarray, list]:
     """
     Integrate the rocket's state using the classical Runge-Kutta 4th order method.
@@ -33,6 +37,8 @@ def integrate_rk4(
         log_interval: How often to log detailed output (seconds)
         controller: Attitude/thrust controller instance
         mission_planner: Mission phase and setpoint manager
+        telemetry_callback: Optional callback to receive live telemetry frames
+        telemetry_interval: Minimum seconds between telemetry frames
 
     Returns:
         Tuple containing:
@@ -46,6 +52,7 @@ def integrate_rk4(
     current_time = t_0
     current_state = initial_state.copy()
     last_logged_time = None
+    last_telemetry_time = None
     phase_transitions = []
 
     # Progress bar
@@ -119,6 +126,25 @@ def integrate_rk4(
         state_values.append(current_state.copy())
         phase_transitions = mission_planner.get_phase_transitions()
 
+        if telemetry_callback is not None:
+            should_emit = telemetry_interval is None or (
+                last_telemetry_time is None
+                or round(current_time - last_telemetry_time, 12) >= telemetry_interval
+            )
+            if should_emit:
+                telemetry_callback(
+                    {
+                        "time_s": float(current_time),
+                        "phase": mission_planner.current_phase.name,
+                        "position_m": current_state[0:3].tolist(),
+                        "velocity_ms": current_state[3:6].tolist(),
+                        "quaternion": current_state[6:10].tolist(),
+                        "angular_velocity_rads": current_state[10:13].tolist(),
+                        "propellant_mass_kg": float(current_state[13]),
+                    }
+                )
+                last_telemetry_time = current_time
+
         # Progress bar
         p_bar.update(1)
 
@@ -136,6 +162,8 @@ def integrate_verlet(
     log_interval: float,
     controller: Controller,
     mission_planner: MissionPlanner,
+    telemetry_callback: Callable[[dict[str, Any]], None] | None = None,
+    telemetry_interval: float | None = None,
 ) -> tuple[np.ndarray, np.ndarray, list]:
     """
     Integrate the rocket's state using the Velocity Verlet method (symplectic integrator).
@@ -150,6 +178,8 @@ def integrate_verlet(
         log_interval: How often to log detailed output (seconds)
         controller: Attitude/thrust controller instance
         mission_planner: Mission phase and setpoint manager
+        telemetry_callback: Optional callback to receive live telemetry frames
+        telemetry_interval: Minimum seconds between telemetry frames
 
     Returns:
         Tuple containing:
@@ -163,6 +193,7 @@ def integrate_verlet(
     current_time = t_0
     current_state = initial_state.copy()
     last_logged_time = None
+    last_telemetry_time = None
     phase_transitions = []
 
     # Progress bar
@@ -261,6 +292,25 @@ def integrate_verlet(
         t_vals.append(current_time)
         state_vals.append(current_state.copy())
         phase_transitions = mission_planner.get_phase_transitions()
+
+        if telemetry_callback is not None:
+            should_emit = telemetry_interval is None or (
+                last_telemetry_time is None
+                or round(current_time - last_telemetry_time, 12) >= telemetry_interval
+            )
+            if should_emit:
+                telemetry_callback(
+                    {
+                        "time_s": float(current_time),
+                        "phase": mission_planner.current_phase.name,
+                        "position_m": current_state[0:3].tolist(),
+                        "velocity_ms": current_state[3:6].tolist(),
+                        "quaternion": current_state[6:10].tolist(),
+                        "angular_velocity_rads": current_state[10:13].tolist(),
+                        "propellant_mass_kg": float(current_state[13]),
+                    }
+                )
+                last_telemetry_time = current_time
 
         p_bar.update(1)
 

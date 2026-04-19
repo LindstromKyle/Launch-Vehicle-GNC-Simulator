@@ -59,7 +59,7 @@ class Environment:
         dz = factor * (5 * z**2 / orbital_radius**2 - 3) * z
         # F = ma
         j2_perturbation = vehicle_mass * np.array([dx, dy, dz])
-
+        j2_perturbation = np.zeros(3)  # TODO: re-enable
         return newtonian_force + j2_perturbation
 
     def atmospheric_density(self, altitude: float) -> float:

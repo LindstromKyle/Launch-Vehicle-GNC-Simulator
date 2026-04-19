@@ -1,6 +1,5 @@
 import asyncio
 import traceback
-from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, HTTPException
 
@@ -8,40 +7,13 @@ from app.models.simulation_models import (
     MonteCarloBatchResponse,
     MonteCarloKickoffResponse,
     MonteCarloRequest,
-    SimulationRequest,
-    SimulationResponse,
 )
-from app.settings import get_settings
-from app.runners.monte_carlo_runner import MonteCarloRunner
-from app.runners.simulation_runner import run_full_orbit_simulation
-from app.storage.monte_carlo_storage import get_monte_carlo_storage
+from app.paths.deps import executor, mc_runner, mc_storage
 
-settings = get_settings()
-
-# Simulation takes a while to run, so use a thread pool
-executor = ThreadPoolExecutor(max_workers=settings.simulator_executor_max_workers)
-
-# Initialize Monte Carlo storage and service
-mc_storage = get_monte_carlo_storage()
-mc_runner = MonteCarloRunner()
-
-sim_router = APIRouter(prefix="/simulations", tags=["Simulations"])
+monte_carlo_router = APIRouter(prefix="/simulations", tags=["Simulations"])
 
 
-@sim_router.post("/simulate", response_model=SimulationResponse)
-async def simulate(request: SimulationRequest):
-    try:
-        result = await asyncio.get_running_loop().run_in_executor(
-            executor, run_full_orbit_simulation, request
-        )
-        return result
-    except Exception as e:
-        tb = traceback.format_exc()
-        error_detail = f"Simulation failed: {str(e)} | {tb}"
-        raise HTTPException(status_code=500, detail=error_detail)
-
-
-@sim_router.post("/monte-carlo", response_model=MonteCarloKickoffResponse)
+@monte_carlo_router.post("/monte-carlo", response_model=MonteCarloKickoffResponse)
 async def run_monte_carlo(request: MonteCarloRequest):
     """
     Initiate a Monte Carlo dispersion analysis.
@@ -128,7 +100,9 @@ def _run_monte_carlo_background(batch_id: str, request: MonteCarloRequest):
         )
 
 
-@sim_router.get("/monte-carlo/{batch_id}", response_model=MonteCarloBatchResponse)
+@monte_carlo_router.get(
+    "/monte-carlo/{batch_id}", response_model=MonteCarloBatchResponse
+)
 async def get_monte_carlo_result(batch_id: str):
     """Retrieve results from a Monte Carlo batch."""
     try:
@@ -173,7 +147,7 @@ async def get_monte_carlo_result(batch_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@sim_router.get("/monte-carlo")
+@monte_carlo_router.get("/monte-carlo")
 async def list_monte_carlo_runs():
     """
     List all Monte Carlo batches with basic info.

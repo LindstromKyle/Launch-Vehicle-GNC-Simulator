@@ -124,6 +124,9 @@ The simulator includes a FastAPI service and Monte Carlo batch endpoints.
 |---|---|---|---|
 | GET | `/health` | Service health and runtime environment | `200` |
 | POST | `/simulations/simulate` | Run one simulation request and return results | `200`, `422`, `500` |
+| GET | `/simulations/live/view` | Minimal browser UI to start/connect and view live telemetry text | `200` |
+| POST | `/simulations/live/start` | Kick off async simulation run with live telemetry stream | `200`, `422`, `500` |
+| WS | `/simulations/live/{run_id}/ws` | WebSocket stream of telemetry frames and final status | `101`, `404` |
 | POST | `/simulations/monte-carlo` | Kick off async Monte Carlo batch run | `200`, `422`, `500` |
 | GET | `/simulations/monte-carlo` | List Monte Carlo batches | `200`, `500` |
 | GET | `/simulations/monte-carlo/{batch_id}` | Poll a batch by id (returns `202` while in progress) | `200`, `202`, `404`, `500` |
@@ -171,6 +174,32 @@ curl http://localhost:8000/simulations/monte-carlo/<batch_id>
 ```
 
 Note: Monte Carlo runs execute in the background via a thread pool. Polling can return `202` until the batch completes.
+
+### Live Telemetry Example
+
+Browser viewer page:
+
+```text
+http://localhost:8000/simulations/live/view
+```
+
+The page can start a new live run and stream telemetry in plain text directly in the browser.
+
+Start a live run (returns immediately with a `run_id`):
+
+```bash
+curl -X POST "http://localhost:8000/simulations/live/start?telemetry_interval=0.5" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+WebSocket stream URL:
+
+```text
+ws://localhost:8000/simulations/live/<run_id>/ws
+```
+
+The socket sends telemetry messages with `type=telemetry` while running and one final `type=status` payload on completion or failure.
 
 ## Docker Containerization
 

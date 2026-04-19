@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Live Telemetry Viewer</title>
+    <link rel="stylesheet" href="/simulations/live/assets/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1 class="title">Live Telemetry Viewer</h1>
+            <p class="subtitle">Real-time telemetry stream from simulation runs.</p>
+        </header>
+
+        <section class="controls">
+            <input id="runId" placeholder="run_id (leave empty to start a new run)" />
+            <input id="interval" type="number" min="0.05" step="0.05" value="0.5" />
+            <button id="startBtn">Start + Connect</button>
+            <button id="connectBtn">Connect Existing</button>
+            <button id="disconnectBtn">Disconnect</button>
+            <button id="clearBtn">Clear Log</button>
+        </section>
+
+        <section class="kpis">
+            <div class="kpi">
+                <div class="kpi-label">Connection</div>
+                <div id="connState" class="kpi-value">idle</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-label">Current Phase</div>
+                <div id="phaseValue" class="kpi-value">-</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-label">Altitude (km)</div>
+                <div id="altValue" class="kpi-value">-</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-label">Speed (km/s)</div>
+                <div id="spdValue" class="kpi-value">-</div>
+            </div>
+        </section>
+
+        <section class="charts">
+            <div class="panel">
+                <h2>Altitude vs Time</h2>
+                <div class="chart-wrap">
+                    <canvas id="altChart"></canvas>
+                </div>
+            </div>
+            <div class="panel">
+                <h2>Speed vs Time</h2>
+                <div class="chart-wrap">
+                    <canvas id="spdChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel orbit-panel">
+            <h2>3D Orbit View</h2>
+            <div id="orbitPlot" class="orbit-plot"></div>
+        </section>
+
+        <section class="panel phase-panel">
+            <h2>Phase Timeline</h2>
+            <div id="phaseStrip" class="phase-strip"></div>
+        </section>
+
+        <section class="panel">
+            <h2>Event Log</h2>
+            <div id="log" class="log"></div>
+        </section>
+    </div>
+
+    <script src="/simulations/live/assets/app.js"></script>
+</body>
+
+</html>

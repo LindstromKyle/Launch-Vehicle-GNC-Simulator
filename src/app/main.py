@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 
-from app.paths.simulation_paths import sim_router
+from app.paths.live import live_router
+from app.paths.monte_carlo import monte_carlo_router
+from app.paths.simulation import simulation_router
 from app.settings import get_settings
 
 settings = get_settings()
@@ -11,7 +13,9 @@ app = FastAPI(
     debug=settings.debug,
 )
 
-app.include_router(sim_router)
+app.include_router(simulation_router)
+app.include_router(live_router)
+app.include_router(monte_carlo_router)
 
 
 @app.get("/health")

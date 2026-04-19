@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Any, Callable
 
 import numpy as np
 
@@ -60,9 +61,17 @@ class Simulator:
         """
         self.controller = controller
 
-    def run(self) -> tuple[np.ndarray, np.ndarray, list]:
+    def run(
+        self,
+        telemetry_callback: Callable[[dict[str, Any]], None] | None = None,
+        telemetry_interval: float | None = None,
+    ) -> tuple[np.ndarray, np.ndarray, list]:
         """
         Execute the full simulation using the selected integrator.
+
+        Args:
+            telemetry_callback: Optional callback for receiving live telemetry frames
+            telemetry_interval: Minimum seconds between emitted telemetry frames
 
         Returns:
             Tuple containing:
@@ -95,6 +104,8 @@ class Simulator:
             log_interval=self.log_interval,
             controller=self.controller,
             mission_planner=self.mission_planner,
+            telemetry_callback=telemetry_callback,
+            telemetry_interval=telemetry_interval,
         )
 
         return t_vals, state_vals, phase_transitions
