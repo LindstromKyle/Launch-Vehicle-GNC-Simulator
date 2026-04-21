@@ -1,4 +1,4 @@
-# Launch Vehicle GNC Simulator
+# Orbital Mechanics GNC Simulator
 
 [![CI](https://github.com/LindstromKyle/Launch-Vehicle-GNC-Simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/LindstromKyle/Launch-Vehicle-GNC-Simulator/actions/workflows/ci.yml)
 [![Docker Build](https://github.com/LindstromKyle/Launch-Vehicle-GNC-Simulator/actions/workflows/docker-build.yml/badge.svg)](https://github.com/LindstromKyle/Launch-Vehicle-GNC-Simulator/actions/workflows/docker-build.yml)
@@ -23,7 +23,7 @@ This project is a modular, physics-based 6-DoF rocket ascent simulator that mode
 
 <br>
 
-![Telemetry](readme_imgs/live_telemetry.gif)
+![Telemetry](readme_imgs/constellation.gif)
 
 ## Key Achievements
 

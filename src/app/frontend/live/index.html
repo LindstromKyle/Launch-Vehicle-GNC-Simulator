@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Live Telemetry Viewer</title>
+    <title>GNC Live Telemetry</title>
     <link rel="stylesheet" href="/simulations/live/assets/styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
@@ -14,13 +14,14 @@
     <div class="container">
         <header>
             <h1 class="title">Live Telemetry Viewer</h1>
-            <p class="subtitle">Real-time telemetry stream from simulation runs.</p>
+            <p class="subtitle">Real-time telemetry stream — launch vehicle or W-series constellation.</p>
         </header>
 
         <section class="controls">
             <input id="runId" placeholder="run_id (leave empty to start a new run)" />
             <input id="interval" type="number" min="0.05" step="0.05" value="0.5" />
             <button id="startBtn">Start + Connect</button>
+            <button id="constellationBtn" class="constellation-btn">Launch Constellation</button>
             <button id="connectBtn">Connect Existing</button>
             <button id="disconnectBtn">Disconnect</button>
             <button id="clearBtn">Clear Log</button>
@@ -44,6 +45,8 @@
                 <div id="spdValue" class="kpi-value">-</div>
             </div>
         </section>
+
+        <div id="vehicleTabs" class="vehicle-tabs" style="display:none;"></div>
 
         <section class="charts">
             <div class="panel">

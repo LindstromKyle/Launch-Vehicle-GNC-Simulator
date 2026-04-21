@@ -304,3 +304,40 @@ class Falcon9SecondStage(Vehicle):
                         "max_thrust": rcs_max_thrust,
                     }
                 )
+
+
+class WSeriesCapsule(Vehicle):
+    """
+    Varda W-series reentry capsule in passive LEO orbit.
+
+    A lightweight capsule with no main propulsion. Only gravitational and
+    aerodynamic forces act on it; attitude is passively stable.
+
+    Args:
+        dry_mass: Dry mass of the capsule (kg)
+        cross_sectional_area: Reference drag area (m²)
+    """
+
+    def __init__(self, dry_mass: float = 350.0, cross_sectional_area: float = 1.5):
+        inertia = np.diag([120.0, 120.0, 80.0])  # kg·m², small cylindrical capsule
+        super().__init__(
+            dry_mass=dry_mass,
+            initial_prop_mass=0.0,
+            base_thrust_magnitude=0.0,
+            average_isp=1.0,  # placeholder; zero thrust → zero mass flow
+            moment_of_inertia=inertia,
+            base_drag_coefficient=1.1,
+            drag_scaling_coefficient=0.0,
+            cross_sectional_area=cross_sectional_area,
+            engine_gimbal_limit_deg=0.0,
+            engine_gimbal_arm_len=0.5,
+            dry_com_z=0.3,
+            prop_com_z=0.3,
+        )
+
+    def _setup_propulsion_system(self) -> None:
+        self.num_engines = 0
+        self.thrust_per_engine = 0.0
+        self.mdot_per_engine = 0.0
+        self.engines = []
+        self.rcs_thrusters = []

@@ -3,6 +3,8 @@ import warnings
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+from simulator.state import State
+
 warnings.filterwarnings("error", category=RuntimeWarning)
 
 
@@ -291,6 +293,83 @@ def compute_acceleration(t_vals: np.ndarray, velocity_vals: np.ndarray) -> np.nd
     """
     acceleration_vals = np.gradient(velocity_vals, t_vals)
     return acceleration_vals
+
+
+def orbital_elements_to_state(
+    semi_major_axis: float,
+    eccentricity: float,
+    inclination_deg: float,
+    raan_deg: float,
+    arg_perigee_deg: float,
+    true_anomaly_deg: float,
+    mu: float,
+    prop_mass: float = 0.0,
+) -> State:
+    """
+    Convert Keplerian orbital elements to a State in the ECI frame.
+
+    Args:
+        semi_major_axis: Semi-major axis (m)
+        eccentricity: Orbital eccentricity (0 for circular)
+        inclination_deg: Inclination (degrees)
+        raan_deg: Right Ascension of Ascending Node (degrees)
+        arg_perigee_deg: Argument of perigee (degrees)
+        true_anomaly_deg: True anomaly at epoch (degrees)
+        mu: Gravitational parameter GM (m³/s²)
+        prop_mass: Propellant mass to include in state (kg)
+
+    Returns:
+        State object in ECI frame
+    """
+    from .state import State
+
+    i = np.deg2rad(inclination_deg)
+    Omega = np.deg2rad(raan_deg)
+    omega = np.deg2rad(arg_perigee_deg)
+    nu = np.deg2rad(true_anomaly_deg)
+
+    # Semi-latus rectum and orbital radius
+    p = semi_major_axis * (1.0 - eccentricity**2)
+    r_mag = p / (1.0 + eccentricity * np.cos(nu))
+
+    # Position and velocity in the perifocal (PQW) frame
+    pos_peri = r_mag * np.array([np.cos(nu), np.sin(nu), 0.0])
+    vel_peri = np.sqrt(mu / p) * np.array([-np.sin(nu), eccentricity + np.cos(nu), 0.0])
+
+    # Rotation matrix: perifocal → ECI  (3-1-3 Euler: RAAN, inclination, arg_perigee)
+    cos_O, sin_O = np.cos(Omega), np.sin(Omega)
+    cos_i, sin_i = np.cos(i), np.sin(i)
+    cos_w, sin_w = np.cos(omega), np.sin(omega)
+    Q = np.array(
+        [
+            [
+                cos_O * cos_w - sin_O * sin_w * cos_i,
+                -cos_O * sin_w - sin_O * cos_w * cos_i,
+                sin_O * sin_i,
+            ],
+            [
+                sin_O * cos_w + cos_O * sin_w * cos_i,
+                -sin_O * sin_w + cos_O * cos_w * cos_i,
+                -cos_O * sin_i,
+            ],
+            [sin_w * sin_i, cos_w * sin_i, cos_i],
+        ]
+    )
+
+    position = Q @ pos_peri
+    velocity = Q @ vel_peri
+
+    # Attitude: body +Z points radially outward (nadir-pointing)
+    radial_unit = position / np.linalg.norm(position)
+    quaternion = compute_body_z_to_inertial_quat(radial_unit)
+
+    return State(
+        position=position,
+        velocity=velocity,
+        quaternion=quaternion,
+        angular_velocity=np.zeros(3),
+        propellant_mass=prop_mass,
+    )
 
 
 def quaternion_from_attitude_mode(

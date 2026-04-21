@@ -44,7 +44,7 @@ body {
 
 .controls {
     display: grid;
-    grid-template-columns: 1.4fr 0.7fr repeat(4, 1fr);
+    grid-template-columns: 1.4fr 0.7fr repeat(5, 1fr);
     gap: 10px;
     margin-bottom: 14px;
 }
@@ -197,6 +197,48 @@ button:hover {
     background: #1e4e7d;
 }
 
+/* Constellation button */
+.constellation-btn {
+    background: linear-gradient(180deg, #3a2472 0%, #2a1959 100%) !important;
+    border-color: #7c5cbf !important;
+}
+
+.constellation-btn:hover {
+    border-color: var(--accent) !important;
+}
+
+/* Vehicle selector tabs (constellation mode) */
+.vehicle-tabs {
+    gap: 8px;
+    margin-bottom: 12px;
+    align-items: center;
+}
+
+.vehicle-tabs::before {
+    content: "Viewing:";
+    color: var(--muted);
+    font-size: 12px;
+    margin-right: 4px;
+    white-space: nowrap;
+}
+
+.vehicle-tab {
+    width: auto !important;
+    padding: 6px 18px !important;
+    border-radius: 999px !important;
+    border-color: var(--tab-color, var(--line)) !important;
+    color: var(--tab-color, var(--text)) !important;
+    background: rgba(14, 24, 48, 0.6) !important;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.vehicle-tab.active {
+    background: color-mix(in srgb, var(--tab-color, #66d6ff) 18%, transparent) !important;
+    box-shadow: 0 0 0 1px var(--tab-color, var(--line));
+}
+
 .log {
     height: 300px;
     overflow: auto;
@@ -219,7 +261,7 @@ button:hover {
 
 @media (max-width: 1050px) {
     .controls {
-        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
     }
 
     .kpis,
