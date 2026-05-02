@@ -112,6 +112,3 @@ class LiveTelemetryStorage:
         if run is None:
             raise KeyError(f"Live run not found: {run_id}")
         return run
-
-
-live_telemetry_storage = LiveTelemetryStorage()

@@ -1,15 +1,16 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 
 from app.models.simulation_models import LiveSimulationStartResponse, SimulationRequest
-from app.paths.deps import executor
+from app.paths.deps import get_executor, get_live_telemetry_storage
 from app.runners.multi_orbital_runner import run_constellation_simulation
 from app.runners.simulation_runner import run_full_orbit_simulation
-from app.storage.live_telemetry_storage import live_telemetry_storage
+from app.storage.live_telemetry_storage import LiveTelemetryStorage
 
 live_router = APIRouter(prefix="/simulations", tags=["Simulations"])
 _LIVE_FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend" / "live"
@@ -47,6 +48,8 @@ async def live_viewer_script():
 async def start_live_simulation(
     request: SimulationRequest,
     telemetry_interval: float = Query(0.5, gt=0),
+    executor: ThreadPoolExecutor = Depends(get_executor),
+    live_telemetry_storage: LiveTelemetryStorage = Depends(get_live_telemetry_storage),
 ):
     """Start a simulation in the background and expose live telemetry by run id."""
     run_id = live_telemetry_storage.create_run()
@@ -57,7 +60,11 @@ async def start_live_simulation(
         try:
             result = run_full_orbit_simulation(
                 request=request,
-                telemetry_callback=lambda frame: _emit_live_frame(run_id, frame),
+                telemetry_callback=lambda frame: _emit_live_frame(
+                    live_telemetry_storage,
+                    run_id,
+                    frame,
+                ),
                 telemetry_interval=telemetry_interval,
             )
             live_telemetry_storage.mark_completed(
@@ -76,7 +83,11 @@ async def start_live_simulation(
     )
 
 
-def _emit_live_frame(run_id: str, frame: dict[str, Any]) -> None:
+def _emit_live_frame(
+    live_telemetry_storage: LiveTelemetryStorage,
+    run_id: str,
+    frame: dict[str, Any],
+) -> None:
     """Attach run metadata and persist an emitted telemetry frame."""
     live_telemetry_storage.append_frame(run_id=run_id, frame=frame)
 
@@ -86,6 +97,8 @@ def _emit_live_frame(run_id: str, frame: dict[str, Any]) -> None:
 )
 async def start_constellation_simulation(
     telemetry_interval: float = Query(10.0, gt=0),
+    executor: ThreadPoolExecutor = Depends(get_executor),
+    live_telemetry_storage: LiveTelemetryStorage = Depends(get_live_telemetry_storage),
 ):
     """Start a W-series constellation simulation and stream live telemetry.
 
@@ -100,7 +113,11 @@ async def start_constellation_simulation(
         live_telemetry_storage.mark_running(run_id)
         try:
             run_constellation_simulation(
-                telemetry_callback=lambda frame: _emit_live_frame(run_id, frame),
+                telemetry_callback=lambda frame: _emit_live_frame(
+                    live_telemetry_storage,
+                    run_id,
+                    frame,
+                ),
             )
             live_telemetry_storage.mark_completed(run_id=run_id, summary=None)
         except Exception as exc:
@@ -116,7 +133,11 @@ async def start_constellation_simulation(
 
 
 @live_router.websocket("/live/{run_id}/ws")
-async def stream_live_frames_ws(websocket: WebSocket, run_id: str):
+async def stream_live_frames_ws(
+    websocket: WebSocket,
+    run_id: str,
+    live_telemetry_storage: LiveTelemetryStorage = Depends(get_live_telemetry_storage),
+):
     await websocket.accept()
     last_seq = 0
     try:
