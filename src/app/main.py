@@ -1,11 +1,11 @@
-from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import Depends, FastAPI
 
-from app.paths.live import live_router
 from app.paths.deps import get_settings
+from app.paths.live import live_router
 from app.paths.monte_carlo import monte_carlo_router
 from app.paths.simulation import simulation_router
 from app.runners.monte_carlo_runner import MonteCarloRunner
