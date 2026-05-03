@@ -44,12 +44,13 @@ body {
 
 .controls {
     display: grid;
-    grid-template-columns: 1.4fr 0.7fr repeat(5, 1fr);
+    grid-template-columns: 1.8fr repeat(5, 1fr);
     gap: 10px;
     margin-bottom: 14px;
 }
 
 input,
+select,
 button {
     width: 100%;
     border-radius: 10px;
@@ -141,11 +142,40 @@ button:hover {
     font-size: 16px;
 }
 
-.phase-panel {
-    margin-bottom: 12px;
+.panel-subtitle {
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.command-panel {
+    margin-bottom: 0;
+}
+
+.command-grid {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 8px 12px;
+    align-items: center;
+}
+
+.command-grid button {
+    grid-column: 2;
+}
+
+.field-label {
+    color: var(--muted);
+    font-size: 12px;
 }
 
 .orbit-panel {
+    margin-bottom: 12px;
+}
+
+.ops-panels {
+    display: grid;
+    grid-template-columns: minmax(300px, 30%) minmax(0, 70%);
+    gap: 12px;
     margin-bottom: 12px;
 }
 
@@ -264,9 +294,18 @@ button:hover {
         grid-template-columns: 1fr 1fr 1fr 1fr;
     }
 
+    .command-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .command-grid button {
+        grid-column: auto;
+    }
+
     .kpis,
-    .charts {
-        grid-template-columns: 1fr 1fr;
+    .charts,
+    .ops-panels {
+        grid-template-columns: minmax(260px, 35%) minmax(0, 65%);
     }
 }
 
@@ -274,7 +313,8 @@ button:hover {
 
     .controls,
     .kpis,
-    .charts {
+    .charts,
+    .ops-panels {
         grid-template-columns: 1fr;
     }
 

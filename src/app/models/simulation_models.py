@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal
 
 from pydantic import BaseModel, Field
 
@@ -164,3 +164,25 @@ class LiveSimulationStartResponse(BaseModel):
     run_id: str
     status: str
     created_at: str
+
+
+class DeorbitCommandRequest(BaseModel):
+    run_id: str = Field(min_length=1)
+    vehicle_id: str = Field(min_length=1)
+    action: Literal["deorbit_burn"]
+    execute_at_sim_time_s: float = Field(
+        ge=0,
+        description="Simulation time when command should execute",
+    )
+    target_perigee_alt_km: float = Field(
+        gt=0,
+        le=200,
+        description="Requested target perigee altitude in kilometers",
+    )
+
+
+class CommandUploadResponse(BaseModel):
+    command_id: str
+    status: Literal["accepted", "rejected"]
+    server_received_at: str
+    reason: str | None = None

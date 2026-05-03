@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Callable
 
 import numpy as np
@@ -252,6 +253,16 @@ def integrate_verlet(
         # Full position update
         current_state[:3] += current_state[3:6] * h
 
+        # Guard: stop if state has gone non-finite (overflow or NaN)
+        if not np.all(np.isfinite(current_state[:6])):
+            logging.error(
+                "State vector non-finite at t=%.2f s (pos=%s vel=%s) - stopping integration.",
+                current_time,
+                current_state[:3],
+                current_state[3:6],
+            )
+            break
+
         # Quaternion update
         omega = current_state[10:13]
         omega_norm = np.linalg.norm(omega)
@@ -286,6 +297,14 @@ def integrate_verlet(
         # Finish velocity and angular velocity
         current_state[3:6] += 0.5 * acc_new * h
         current_state[10:13] += 0.5 * ang_acc_new * h
+
+        # Stop if the vehicle has reached or passed Earth's surface
+        if np.linalg.norm(current_state[:3]) < environment.earth_radius:
+            logging.info(
+                "Ground contact detected at t=%.2f s — stopping integration.",
+                current_time + h,
+            )
+            break
 
         # Append results
         current_time += h

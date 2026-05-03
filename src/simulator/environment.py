@@ -135,13 +135,17 @@ class Environment:
             + vehicle.drag_scaling_coefficient * np.sin(angle_of_attack) ** 2
         )
 
+        effective_area = vehicle.cross_sectional_area
+        if getattr(vehicle, "parachute_deployed", False):
+            effective_area *= float(getattr(vehicle, "parachute_drag_multiplier", 1.0))
+
         # Compute drag magnitude
         drag_magnitude = (
             0.5
             * density
             * relative_velocity_magnitude**2
             * total_drag_coefficient
-            * vehicle.cross_sectional_area
+            * effective_area
         )
 
         return drag_magnitude * drag_unit_vector

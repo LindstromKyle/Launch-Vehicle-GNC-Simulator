@@ -307,37 +307,90 @@ class Falcon9SecondStage(Vehicle):
 
 
 class WSeriesCapsule(Vehicle):
-    """
-    Varda W-series reentry capsule in passive LEO orbit.
+    """W-series capsule with simple deorbit and reentry control capability.
 
-    A lightweight capsule with no main propulsion. Only gravitational and
-    aerodynamic forces act on it; attitude is passively stable.
+    - Finite deorbit burns via one centered main engine
+    - Attitude control via a symmetric capsule RCS layout
+    - Parachute drag regime toggle for terminal descent
 
     Args:
         dry_mass: Dry mass of the capsule (kg)
         cross_sectional_area: Reference drag area (m²)
+        initial_prop_mass: Main-propellant mass budget for deorbit burn (kg)
     """
 
-    def __init__(self, dry_mass: float = 350.0, cross_sectional_area: float = 1.5):
-        inertia = np.diag([120.0, 120.0, 80.0])  # kg·m², small cylindrical capsule
+    def __init__(
+        self,
+        dry_mass: float = 350.0,
+        cross_sectional_area: float = 1.5,
+        initial_prop_mass: float = 35.0,
+    ):
+        inertia = np.diag([120.0, 120.0, 80.0])
+        self.parachute_deployed = False
+        self.parachute_drag_multiplier = 50.0
         super().__init__(
             dry_mass=dry_mass,
-            initial_prop_mass=0.0,
-            base_thrust_magnitude=0.0,
-            average_isp=1.0,  # placeholder; zero thrust → zero mass flow
+            initial_prop_mass=initial_prop_mass,
+            base_thrust_magnitude=550.0,
+            average_isp=220.0,
             moment_of_inertia=inertia,
             base_drag_coefficient=1.1,
             drag_scaling_coefficient=0.0,
             cross_sectional_area=cross_sectional_area,
-            engine_gimbal_limit_deg=0.0,
-            engine_gimbal_arm_len=0.5,
+            engine_gimbal_limit_deg=5.0,
+            engine_gimbal_arm_len=0.45,
             dry_com_z=0.3,
-            prop_com_z=0.3,
+            prop_com_z=0.25,
         )
 
     def _setup_propulsion_system(self) -> None:
-        self.num_engines = 0
-        self.thrust_per_engine = 0.0
-        self.mdot_per_engine = 0.0
-        self.engines = []
+        self.num_engines = 1
+        self.thrust_per_engine = self.base_thrust_magnitude
+        self.mdot_per_engine = self.mdot_max
+        self.engines = [{"position": np.array([0.0, 0.0, -self.engine_lever_arm])}]
+
+        rcs_max_thrust = 18.0
+        rcs_radius = 0.7
+        rcs_arm = 0.35
+
+        positions = [
+            np.array([rcs_radius, 0.0, rcs_arm]),
+            np.array([0.0, rcs_radius, rcs_arm]),
+            np.array([-rcs_radius, 0.0, rcs_arm]),
+            np.array([0.0, -rcs_radius, rcs_arm]),
+        ]
+        tangential_directions = [
+            np.array([0.0, 1.0, 0.0]),
+            np.array([-1.0, 0.0, 0.0]),
+            np.array([0.0, -1.0, 0.0]),
+            np.array([1.0, 0.0, 0.0]),
+        ]
+        radial_directions = [
+            np.array([1.0, 0.0, 0.0]),
+            np.array([0.0, 1.0, 0.0]),
+            np.array([-1.0, 0.0, 0.0]),
+            np.array([0.0, -1.0, 0.0]),
+        ]
+
         self.rcs_thrusters = []
+        for idx in range(4):
+            for sign in [1.0, -1.0]:
+                self.rcs_thrusters.append(
+                    {
+                        "position": positions[idx],
+                        "direction": sign
+                        * tangential_directions[idx]
+                        / np.linalg.norm(tangential_directions[idx]),
+                        "max_thrust": rcs_max_thrust,
+                    }
+                )
+            for sign in [1.0, -1.0]:
+                self.rcs_thrusters.append(
+                    {
+                        "position": positions[idx],
+                        "direction": sign
+                        * radial_directions[idx]
+                        / np.linalg.norm(radial_directions[idx]),
+                        "max_thrust": rcs_max_thrust,
+                    }
+                )

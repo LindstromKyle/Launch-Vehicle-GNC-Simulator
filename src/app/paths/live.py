@@ -6,9 +6,14 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 
-from app.models.simulation_models import LiveSimulationStartResponse, SimulationRequest
+from app.models.simulation_models import (
+    CommandUploadResponse,
+    DeorbitCommandRequest,
+    LiveSimulationStartResponse,
+    SimulationRequest,
+)
 from app.paths.deps import get_executor, get_live_telemetry_storage
-from app.runners.multi_orbital_runner import run_constellation_simulation
+from app.runners.multi_orbital_runner import CONSTELLATION, run_constellation_simulation
 from app.runners.simulation_runner import run_full_orbit_simulation
 from app.storage.live_telemetry_storage import LiveTelemetryStorage
 
@@ -52,7 +57,7 @@ async def start_live_simulation(
     live_telemetry_storage: LiveTelemetryStorage = Depends(get_live_telemetry_storage),
 ):
     """Start a simulation in the background and expose live telemetry by run id."""
-    run_id = live_telemetry_storage.create_run()
+    run_id = live_telemetry_storage.create_run(run_kind="single_orbit")
     status_payload = live_telemetry_storage.get_run_status(run_id)
 
     def _run_background() -> None:
@@ -102,11 +107,15 @@ async def start_constellation_simulation(
 ):
     """Start a W-series constellation simulation and stream live telemetry.
 
-    Runs three satellites (W-1, W-2, W-3) in distinct LEO orbital planes.
+    Runs three satellites in distinct LEO orbital planes.
     Each telemetry frame is tagged with ``vehicle_id`` so the frontend can
     render separate traces per satellite.
     """
-    run_id = live_telemetry_storage.create_run()
+    allowed_vehicle_ids = [name for name, *_ in CONSTELLATION]
+    run_id = live_telemetry_storage.create_run(
+        run_kind="constellation",
+        allowed_vehicle_ids=allowed_vehicle_ids,
+    )
     status_payload = live_telemetry_storage.get_run_status(run_id)
 
     def _run_background() -> None:
@@ -117,6 +126,16 @@ async def start_constellation_simulation(
                     live_telemetry_storage,
                     run_id,
                     frame,
+                ),
+                command_provider=lambda vehicle_id, sim_time_s: live_telemetry_storage.pop_due_commands(
+                    run_id=run_id,
+                    vehicle_id=vehicle_id,
+                    sim_time_s=sim_time_s,
+                ),
+                command_event_callback=lambda event: _emit_live_frame(
+                    live_telemetry_storage,
+                    run_id,
+                    event,
                 ),
             )
             live_telemetry_storage.mark_completed(run_id=run_id, summary=None)
@@ -129,6 +148,46 @@ async def start_constellation_simulation(
         run_id=run_id,
         status=status_payload["status"],
         created_at=status_payload["created_at"],
+    )
+
+
+@live_router.post("/live/constellation/command", response_model=CommandUploadResponse)
+async def upload_constellation_command(
+    request: DeorbitCommandRequest,
+    live_telemetry_storage: LiveTelemetryStorage = Depends(get_live_telemetry_storage),
+):
+    """Queue a deorbit command for a constellation vehicle.
+
+    Validates and queues commands, then emits acceptance telemetry.
+    """
+    upload = live_telemetry_storage.enqueue_deorbit_command(
+        run_id=request.run_id,
+        vehicle_id=request.vehicle_id,
+        execute_at_sim_time_s=request.execute_at_sim_time_s,
+        target_perigee_alt_km=request.target_perigee_alt_km,
+    )
+
+    if upload["status"] == "accepted":
+        _emit_live_frame(
+            live_telemetry_storage,
+            request.run_id,
+            {
+                "event_type": "command",
+                "event_name": "command_accepted",
+                "action": request.action,
+                "command_id": upload["command_id"],
+                "vehicle_id": request.vehicle_id,
+                "execute_at_sim_time_s": request.execute_at_sim_time_s,
+                "target_perigee_alt_km": request.target_perigee_alt_km,
+                "server_received_at": upload["server_received_at"],
+            },
+        )
+
+    return CommandUploadResponse(
+        command_id=upload["command_id"],
+        status=upload["status"],
+        server_received_at=upload["server_received_at"],
+        reason=upload.get("reason"),
     )
 
 
@@ -161,7 +220,10 @@ async def stream_live_frames_ws(
             )
 
             for frame in frames_payload["frames"]:
-                await websocket.send_json({"type": "telemetry", "data": frame})
+                message_type = (
+                    "command" if frame.get("event_type") == "command" else "telemetry"
+                )
+                await websocket.send_json({"type": message_type, "data": frame})
                 last_seq = max(last_seq, int(frame["seq"]))
 
             if status["status"] in {"completed", "failed"}:

@@ -1,8 +1,19 @@
 const EARTH_RADIUS_M = 6371000;
+const EARTH_OMEGA = 7.292115e-5; // rad/s, Earth rotation rate
+
+// Ground-relative speed: subtract atmosphere co-rotation (omega x position)
+function groundRelativeSpeed(pos, vel) {
+    // omega x pos = [-omega*py, omega*px, 0]
+    const relVx = vel[0] - (-EARTH_OMEGA * pos[1]);
+    const relVy = vel[1] - (EARTH_OMEGA * pos[0]);
+    const relVz = vel[2];
+    return Math.hypot(relVx, relVy, relVz);
+}
 const MAX_POINTS = 1500;
 const ORBIT_RENDER_MIN_INTERVAL_MS = 50;
 const ORBIT_INTERACTION_POLL_MS = 120;
 const TELEMETRY_LOG_EVERY_N = 100;
+const DEFAULT_ROCKET_TELEMETRY_INTERVAL_S = 0.5;
 
 // ---------------------------------------------------------------------------
 // Constellation configuration (dynamic vehicle discovery)
@@ -29,12 +40,13 @@ const vehicleTraceIndices = {};
 // ---------------------------------------------------------------------------
 
 const runIdInput = document.getElementById("runId");
-const intervalInput = document.getElementById("interval");
+const cmdActionInput = document.getElementById("cmdAction");
+const cmdExecuteAtInput = document.getElementById("cmdExecuteAt");
+const cmdTargetPerigeeInput = document.getElementById("cmdTargetPerigee");
 const connState = document.getElementById("connState");
 const phaseValue = document.getElementById("phaseValue");
 const altValue = document.getElementById("altValue");
 const spdValue = document.getElementById("spdValue");
-const phaseStrip = document.getElementById("phaseStrip");
 const logEl = document.getElementById("log");
 const orbitPlotEl = document.getElementById("orbitPlot");
 
@@ -43,7 +55,6 @@ const orbitPlotEl = document.getElementById("orbitPlot");
 // ---------------------------------------------------------------------------
 
 let ws = null;
-let phaseSeen = [];
 
 const altData = { t: [], y: [] };
 const spdData = { t: [], y: [] };
@@ -64,6 +75,7 @@ function initVehicleData(vid) {
         orbit: { x: [], y: [], z: [] },
         orbitPlottedCount: 0,
         phaseSeen: [],
+        logCount: 0,
     };
 }
 
@@ -139,7 +151,11 @@ const commonChartOptions = {
         },
     },
     plugins: {
-        legend: { labels: { color: "#cfe2ff" } },
+        legend: {
+            labels: { color: "#cfe2ff" },
+            // Keep the live dataset always visible; legend clicks can hide traces.
+            onClick: () => { },
+        },
     },
 };
 
@@ -605,6 +621,7 @@ function setActiveVehicle(vid) {
     altChart.data.datasets[0].label = `Altitude (km) — ${vid}`;
     altChart.data.datasets[0].borderColor = color;
     altChart.data.datasets[0].backgroundColor = `${color}26`;
+    altChart.data.datasets[0].hidden = false;
     altChart.update("none");
 
     spdChart.data.labels = vd.spdData.t;
@@ -612,6 +629,7 @@ function setActiveVehicle(vid) {
     spdChart.data.datasets[0].label = `Speed (km/s) — ${vid}`;
     spdChart.data.datasets[0].borderColor = color;
     spdChart.data.datasets[0].backgroundColor = `${color}26`;
+    spdChart.data.datasets[0].hidden = false;
     spdChart.update("none");
 
     const altArr = vd.altData.y;
@@ -624,25 +642,6 @@ function setActiveVehicle(vid) {
 // ---------------------------------------------------------------------------
 // Phase strip
 // ---------------------------------------------------------------------------
-
-function upsertPhase(phase) {
-    if (!phase) { return; }
-
-    if (!phaseSeen.includes(phase)) {
-        phaseSeen.push(phase);
-        const chip = document.createElement("span");
-        chip.className = "phase-chip";
-        chip.dataset.phase = phase;
-        chip.textContent = phase;
-        phaseStrip.appendChild(chip);
-    }
-
-    for (const chip of phaseStrip.querySelectorAll(".phase-chip")) {
-        chip.classList.toggle("active", chip.dataset.phase === phase);
-    }
-
-    phaseValue.textContent = phase;
-}
 
 // ---------------------------------------------------------------------------
 // Data helpers
@@ -667,13 +666,12 @@ function handleSingleTelemetry(frame) {
     const vel = frame.velocity_ms || [0, 0, 0];
 
     const radius = Math.hypot(pos[0], pos[1], pos[2]);
-    const speed = Math.hypot(vel[0], vel[1], vel[2]);
     const altitudeKm = (radius - EARTH_RADIUS_M) / 1000;
-    const speedKms = speed / 1000;
+    const speedKms = groundRelativeSpeed(pos, vel) / 1000;
 
     altValue.textContent = Number.isFinite(altitudeKm) ? altitudeKm.toFixed(2) : "-";
     spdValue.textContent = Number.isFinite(speedKms) ? speedKms.toFixed(3) : "-";
-    upsertPhase(frame.phase);
+    phaseValue.textContent = frame.phase || "-";
 
     pushPoint(altData, t, altitudeKm);
     pushPoint(spdData, t, speedKms);
@@ -716,9 +714,8 @@ function handleConstellationTelemetry(frame) {
     const vel = frame.velocity_ms || [0, 0, 0];
 
     const radius = Math.hypot(pos[0], pos[1], pos[2]);
-    const speed = Math.hypot(vel[0], vel[1], vel[2]);
     const altKm = (radius - EARTH_RADIUS_M) / 1000;
-    const spdKms = speed / 1000;
+    const spdKms = groundRelativeSpeed(pos, vel) / 1000;
 
     pushPoint(vd.altData, t, altKm);
     pushPoint(vd.spdData, t, spdKms);
@@ -780,11 +777,12 @@ function resetPlots() {
     spdChart.data.datasets[0].backgroundColor = "rgba(120,240,178,0.15)";
     spdChart.update("none");
 
-    phaseSeen = [];
-    phaseStrip.innerHTML = "";
     phaseValue.textContent = "-";
     altValue.textContent = "-";
     spdValue.textContent = "-";
+
+    altChart.data.datasets[0].hidden = false;
+    spdChart.data.datasets[0].hidden = false;
 
     // Reset constellation state
     constellationMode = false;
@@ -833,15 +831,32 @@ function connectRun(runId) {
             const msg = JSON.parse(evt.data);
             if (msg.type === "telemetry") {
                 handleTelemetry(msg.data);
-                telemetryLogCount += 1;
-                if (telemetryLogCount % TELEMETRY_LOG_EVERY_N === 0) {
-                    appendLine("telemetry", {
-                        seq: msg.data.seq,
-                        time_s: msg.data.time_s,
-                        vehicle_id: msg.data.vehicle_id,
-                        phase: msg.data.phase,
-                    });
+                const d = msg.data;
+                const pos = d.position_m || [0, 0, 0];
+                const vel = d.velocity_ms || [0, 0, 0];
+                const _altKm = (Math.hypot(pos[0], pos[1], pos[2]) - EARTH_RADIUS_M) / 1000;
+                const _spdKms = groundRelativeSpeed(pos, vel) / 1000;
+                const _logEntry = {
+                    seq: d.seq,
+                    time_s: d.time_s,
+                    ...(d.vehicle_id ? { vehicle_id: d.vehicle_id } : {}),
+                    alt_km: Number.isFinite(_altKm) ? +_altKm.toFixed(2) : null,
+                    spd_km_s: Number.isFinite(_spdKms) ? +_spdKms.toFixed(3) : null,
+                };
+                const _vid = d.vehicle_id;
+                if (_vid && vehicleData[_vid]) {
+                    vehicleData[_vid].logCount += 1;
+                    if (vehicleData[_vid].logCount % TELEMETRY_LOG_EVERY_N === 0) {
+                        appendLine("telemetry", _logEntry);
+                    }
+                } else {
+                    telemetryLogCount += 1;
+                    if (telemetryLogCount % TELEMETRY_LOG_EVERY_N === 0) {
+                        appendLine("telemetry", _logEntry);
+                    }
                 }
+            } else if (msg.type === "command") {
+                appendLine("status", msg.data);
             } else if (msg.type === "status") {
                 appendLine("status", msg.data);
                 const status = msg.data?.status || "unknown";
@@ -864,9 +879,8 @@ function connectRun(runId) {
 
 async function startAndConnect() {
     try {
-        const telemetryInterval = Number(intervalInput.value || "0.5");
         const resp = await fetch(
-            `/simulations/live/start?telemetry_interval=${telemetryInterval}`,
+            `/simulations/live/start?telemetry_interval=${DEFAULT_ROCKET_TELEMETRY_INTERVAL_S}`,
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -902,12 +916,52 @@ async function startConstellation() {
     }
 }
 
+async function sendDeorbitCommand() {
+    try {
+        const runId = (runIdInput.value || "").trim();
+        const vehicleId = activeVehicle;
+        const action = (cmdActionInput?.value || "deorbit_burn").trim();
+        const executeAt = Number(cmdExecuteAtInput.value || "0");
+        const targetPerigee = Number(cmdTargetPerigeeInput.value || "0");
+
+        if (!runId) {
+            appendLine("error", { event: "validation", message: "run_id is required" });
+            return;
+        }
+        if (!vehicleId) {
+            appendLine("error", {
+                event: "validation",
+                message: "No active satellite selected. Launch/connect to a constellation run and pick a satellite tab.",
+            });
+            return;
+        }
+
+        const resp = await fetch("/simulations/live/constellation/command", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                run_id: runId,
+                vehicle_id: vehicleId,
+                action,
+                execute_at_sim_time_s: executeAt,
+                target_perigee_alt_km: targetPerigee,
+            }),
+        });
+
+        const data = await resp.json();
+        appendLine("status", { event: "command_upload", ...data });
+    } catch (err) {
+        appendLine("error", { event: "command_upload_error", error: String(err) });
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Button wiring
 // ---------------------------------------------------------------------------
 
 document.getElementById("startBtn").addEventListener("click", startAndConnect);
 document.getElementById("constellationBtn").addEventListener("click", startConstellation);
+document.getElementById("sendCommandBtn").addEventListener("click", sendDeorbitCommand);
 
 document.getElementById("connectBtn").addEventListener("click", () => {
     const runId = (runIdInput.value || "").trim();

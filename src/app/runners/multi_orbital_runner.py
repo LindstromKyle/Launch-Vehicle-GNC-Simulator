@@ -6,15 +6,24 @@ emitting telemetry frames tagged with ``vehicle_id`` for each satellite.
 
 from __future__ import annotations
 
+import logging
 import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from typing import Any, Callable
 
 import numpy as np
 
-from simulator.controller import Controller
+from simulator.controller import Controller, PIDAttitudeController
 from simulator.environment import Environment
-from simulator.guidance import TimeBasedGuidancePhase
+from simulator.guidance import (
+    AwaitCommandGuidancePhase,
+    BallisticReentryGuidancePhase,
+    DeorbitBurnGuidancePhase,
+    ParachuteDescentGuidancePhase,
+    TimeBasedGuidancePhase,
+)
 from simulator.mission import MissionPlanner
 from simulator.simulator import Simulator
 from simulator.utils import orbital_elements_to_state
@@ -42,10 +51,17 @@ CONSTELLATION: list[tuple[str, float, float, float, float, float, float]] = [
 # Simulation parameters
 # ---------------------------------------------------------------------------
 
-_T_FINAL = 6_000.0  # ~one full LEO orbital period (s)
-_DELTA_T = 5.0  # Integration step size (s)
+_T_FINAL = 8_000.0  # Final sim time (s)
+_DELTA_T = 1.0  # Integration step size (s)
 _TELEMETRY_INTERVAL = 10.0  # Minimum seconds between emitted frames
 _STEP_DELAY_S = 0.05  # Real-time sleep between emitted frames (seconds)
+
+
+@dataclass
+class DeorbitCommandState:
+    armed: bool = False
+    command_id: str | None = None
+    target_perigee_alt_km: float | None = None
 
 
 class PassiveOrbitController(Controller):
@@ -80,12 +96,68 @@ class PassiveOrbitController(Controller):
 def _make_tagged_callback(
     vehicle_id: str,
     base_callback: Callable[[dict[str, Any]], None],
+    command_provider: Callable[[str, float], list[dict[str, Any]]] | None,
+    command_event_callback: Callable[[dict[str, Any]], None] | None,
+    command_state: DeorbitCommandState,
 ) -> Callable[[dict[str, Any]], None]:
-    """Return a wrapper that stamps every frame with ``vehicle_id``."""
+    """Return a wrapper that stamps telemetry and updates command-driven state."""
+
+    phase_to_event = {
+        "Deorbit Burn": "burn_started",
+        "Ballistic Reentry": "reentry_started",
+        "Parachute Descent": "parachute_deployed",
+        "Landed": "landed",
+    }
+    last_phase: str | None = None
 
     def _tagged(frame: dict[str, Any]) -> None:
+        nonlocal last_phase
         frame["vehicle_id"] = vehicle_id
         base_callback(frame)
+
+        sim_time_s = float(frame.get("time_s", 0.0))
+
+        if command_provider is not None and command_event_callback is not None:
+            due_commands = command_provider(vehicle_id, sim_time_s)
+            for command in due_commands:
+                command_state.armed = True
+                command_state.command_id = str(command.get("command_id"))
+                command_state.target_perigee_alt_km = float(
+                    command.get("target_perigee_alt_km", 0.0)
+                )
+
+                command_event_callback(
+                    {
+                        "event_type": "command",
+                        "event_name": "command_armed",
+                        "action": command.get("action"),
+                        "command_id": command_state.command_id,
+                        "vehicle_id": vehicle_id,
+                        "execute_at_sim_time_s": command.get("execute_at_sim_time_s"),
+                        "executed_at_sim_time_s": sim_time_s,
+                        "target_perigee_alt_km": command_state.target_perigee_alt_km,
+                    }
+                )
+
+        current_phase = str(frame.get("phase") or "")
+        if (
+            command_event_callback is not None
+            and current_phase != last_phase
+            and current_phase in phase_to_event
+        ):
+            command_event_callback(
+                {
+                    "event_type": "command",
+                    "event_name": phase_to_event[current_phase],
+                    "vehicle_id": vehicle_id,
+                    "command_id": command_state.command_id,
+                    "time_s": sim_time_s,
+                    "phase": current_phase,
+                    "target_perigee_alt_km": command_state.target_perigee_alt_km,
+                }
+            )
+        last_phase = current_phase
+
         if _STEP_DELAY_S > 0:
             time.sleep(_STEP_DELAY_S)
 
@@ -101,10 +173,15 @@ def _run_satellite(
     arg_perigee_deg: float,
     true_anomaly_deg: float,
     telemetry_callback: Callable[[dict[str, Any]], None],
+    command_provider: Callable[[str, float], list[dict[str, Any]]] | None = None,
+    command_event_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> None:
-    """Simulate a single W-series satellite and stream its telemetry."""
+    """Simulate a single satellite and stream its telemetry."""
     env = Environment()
     vehicle = WSeriesCapsule()
+    vehicle.parachute_deployed = False
+
+    command_state = DeorbitCommandState()
 
     # Build semi-major axis from perigee radius so each orbit can have unique eccentricity.
     r_perigee = _EARTH_RADIUS_M + perigee_alt_km * 1_000.0
@@ -118,17 +195,40 @@ def _run_satellite(
         arg_perigee_deg=arg_perigee_deg,
         true_anomaly_deg=true_anomaly_deg,
         mu=_MU,
-        prop_mass=0.0,
+        prop_mass=vehicle.initial_propellant_mass,
     )
 
-    # Single coast phase covering the full simulation window
     phases = [
+        AwaitCommandGuidancePhase(
+            command_armed_fn=lambda: command_state.armed,
+            name="Orbit Await Command",
+        ),
+        DeorbitBurnGuidancePhase(
+            command_armed_fn=lambda: command_state.armed,
+            target_perigee_alt_km_fn=lambda: command_state.target_perigee_alt_km,
+            environment=env,
+            burn_throttle=0.35,
+            periapsis_tolerance_m=3_000.0,
+            max_burn_duration_s=600.0,
+            name="Deorbit Burn",
+        ),
+        BallisticReentryGuidancePhase(
+            environment=env,
+            parachute_deploy_alt_m=25_000.0,
+            name="Ballistic Reentry",
+        ),
+        ParachuteDescentGuidancePhase(
+            vehicle=vehicle,
+            environment=env,
+            landing_alt_threshold_m=100.0,
+            name="Parachute Descent",
+        ),
         TimeBasedGuidancePhase(
             end_time=_T_FINAL,
             attitude_mode="passive",
             throttle=0.0,
-            name="Orbit",
-        )
+            name="Landed",
+        ),
     ]
 
     planner = MissionPlanner(phases, env, vehicle, start_time=0.0)
@@ -144,9 +244,22 @@ def _run_satellite(
         log_interval=300.0,
         log_name=f"constellation_{name.lower().replace('-', '_')}",
     )
-    sim.add_controller(PassiveOrbitController())
+    sim.add_controller(
+        PIDAttitudeController(
+            kp=np.array([120.0, 120.0, 80.0]),
+            ki=np.array([0.0, 0.0, 0.0]),
+            kd=np.array([1500.0, 1500.0, 1000.0]),
+            vehicle=vehicle,
+        )
+    )
 
-    tagged_cb = _make_tagged_callback(name, telemetry_callback)
+    tagged_cb = _make_tagged_callback(
+        name,
+        telemetry_callback,
+        command_provider,
+        command_event_callback,
+        command_state,
+    )
     sim.run(telemetry_callback=tagged_cb, telemetry_interval=_TELEMETRY_INTERVAL)
 
 
@@ -157,6 +270,8 @@ def _run_satellite(
 
 def run_constellation_simulation(
     telemetry_callback: Callable[[dict[str, Any]], None],
+    command_provider: Callable[[str, float], list[dict[str, Any]]] | None = None,
+    command_event_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> None:
     """Simulate the full W-series constellation, running satellites in parallel.
 
@@ -178,6 +293,8 @@ def run_constellation_simulation(
                 arg_perigee_deg,
                 ta_deg,
                 telemetry_callback,
+                command_provider,
+                command_event_callback,
             ): name
             for (
                 name,
@@ -194,6 +311,10 @@ def run_constellation_simulation(
             name = futures[future]
             exc = future.exception()
             if exc is not None:
+                tb = "".join(
+                    traceback.format_exception(type(exc), exc, exc.__traceback__)
+                )
+                logging.error("Satellite %s simulation failed:\n%s", name, tb)
                 raise RuntimeError(
                     f"Satellite {name} simulation failed: {exc}"
                 ) from exc

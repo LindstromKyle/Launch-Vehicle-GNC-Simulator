@@ -1,3 +1,4 @@
+import contextvars
 import logging
 from pathlib import Path
 from typing import Any, Callable
@@ -10,6 +11,20 @@ from .integrator import integrate_verlet
 from .mission import MissionPlanner
 from .state import State
 from .vehicle import Vehicle
+
+_sim_log_name_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "sim_log_name", default=None
+)
+_old_record_factory = logging.getLogRecordFactory()
+
+
+def _record_factory(*args: Any, **kwargs: Any) -> logging.LogRecord:
+    record = _old_record_factory(*args, **kwargs)
+    record.sim_log_name = _sim_log_name_ctx.get()
+    return record
+
+
+logging.setLogRecordFactory(_record_factory)
 
 
 class Simulator:
@@ -85,27 +100,42 @@ class Simulator:
         log_dir.mkdir(parents=True, exist_ok=True)
         logfile = log_dir / f"{self.log_name}.log"
 
-        # Set up logging
-        logging.basicConfig(
-            filename=logfile,
-            level=logging.INFO,
-            format="[%(levelname)s] %(message)s",
-            filemode="w",
-        )
+        # Attach a dedicated FileHandler to the root logger so this works even
+        # when uvicorn (or another framework) has already called basicConfig.
+        token = _sim_log_name_ctx.set(self.log_name)
 
-        # Integrate
-        t_vals, state_vals, phase_transitions = integrate_verlet(
-            vehicle=self.vehicle,
-            environment=self.environment,
-            initial_state=self.initial_state.as_vector(),
-            t_0=self.t_0,
-            t_final=self.t_final,
-            delta_t=self.delta_t,
-            log_interval=self.log_interval,
-            controller=self.controller,
-            mission_planner=self.mission_planner,
-            telemetry_callback=telemetry_callback,
-            telemetry_interval=telemetry_interval,
-        )
+        class _SimLogFilter(logging.Filter):
+            def filter(self, record: logging.LogRecord) -> bool:
+                return getattr(record, "sim_log_name", None) == self.log_name
 
-        return t_vals, state_vals, phase_transitions
+            def __init__(self, log_name: str):
+                super().__init__()
+                self.log_name = log_name
+
+        _file_handler = logging.FileHandler(logfile, mode="w")
+        _file_handler.setLevel(logging.INFO)
+        _file_handler.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
+        _file_handler.addFilter(_SimLogFilter(self.log_name))
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.INFO)
+        root_logger.addHandler(_file_handler)
+        try:
+            # Integrate
+            t_vals, state_vals, phase_transitions = integrate_verlet(
+                vehicle=self.vehicle,
+                environment=self.environment,
+                initial_state=self.initial_state.as_vector(),
+                t_0=self.t_0,
+                t_final=self.t_final,
+                delta_t=self.delta_t,
+                log_interval=self.log_interval,
+                controller=self.controller,
+                mission_planner=self.mission_planner,
+                telemetry_callback=telemetry_callback,
+                telemetry_interval=telemetry_interval,
+            )
+            return t_vals, state_vals, phase_transitions
+        finally:
+            root_logger.removeHandler(_file_handler)
+            _file_handler.close()
+            _sim_log_name_ctx.reset(token)

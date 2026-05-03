@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Tuple
+from typing import Callable, Tuple
 
 import numpy as np
 
@@ -572,3 +572,153 @@ class CircBurnGuidancePhase(GuidancePhase):
             throttle = max(self.min_throttle, min(1.0, self.throttle_kp * error))
 
         return desired_quaternion, throttle
+
+
+class AwaitCommandGuidancePhase(GuidancePhase):
+    """Hold a passive orbit state until a command is armed for this vehicle."""
+
+    def __init__(
+        self,
+        command_armed_fn: Callable[[], bool],
+        name: str = "Orbit Await Command",
+    ):
+        self.command_armed_fn = command_armed_fn
+        self.name = name
+        self.attitude_mode = "passive"
+
+    def is_complete(self, time: float, state_vector: np.ndarray) -> bool:
+        _ = (time, state_vector)
+        return bool(self.command_armed_fn())
+
+    def get_setpoints(
+        self, time: float, state_vector: np.ndarray
+    ) -> Tuple[np.ndarray, float]:
+        _ = time
+        return quaternion_from_attitude_mode(state_vector, self.attitude_mode), 0.0
+
+
+class DeorbitBurnGuidancePhase(GuidancePhase):
+    """Finite retrograde burn phase targeting a commanded periapsis altitude."""
+
+    def __init__(
+        self,
+        command_armed_fn: Callable[[], bool],
+        target_perigee_alt_km_fn: Callable[[], float | None],
+        environment: Environment,
+        burn_throttle: float = 0.35,
+        periapsis_tolerance_m: float = 2_500.0,
+        max_burn_duration_s: float = 600.0,
+        name: str = "Deorbit Burn",
+    ):
+        self.command_armed_fn = command_armed_fn
+        self.target_perigee_alt_km_fn = target_perigee_alt_km_fn
+        self.burn_throttle = burn_throttle
+        self.periapsis_tolerance_m = periapsis_tolerance_m
+        self.max_burn_duration_s = max_burn_duration_s
+        self.name = name
+        self.attitude_mode = "retrograde"
+        self.mu = environment.gravitational_constant * environment.earth_mass
+        self.earth_radius = environment.earth_radius
+        self._burn_start_time_s: float | None = None
+
+    def _target_perigee_radius(self) -> float | None:
+        target_perigee_alt_km = self.target_perigee_alt_km_fn()
+        if target_perigee_alt_km is None:
+            return None
+        return self.earth_radius + 1_000.0 * float(target_perigee_alt_km)
+
+    def is_complete(self, time: float, state_vector: np.ndarray) -> bool:
+        if not self.command_armed_fn():
+            return False
+
+        if self._burn_start_time_s is None:
+            self._burn_start_time_s = float(time)
+
+        target_perigee_radius = self._target_perigee_radius()
+        if target_perigee_radius is None:
+            return True
+
+        elements = compute_orbital_elements(
+            state_vector[:3],
+            state_vector[3:6],
+            self.mu,
+        )
+        if (
+            elements["periapsis_radius"]
+            <= target_perigee_radius + self.periapsis_tolerance_m
+        ):
+            return True
+
+        prop_mass = float(state_vector[13])
+        if prop_mass <= 1e-6:
+            return True
+
+        return (float(time) - self._burn_start_time_s) >= self.max_burn_duration_s
+
+    def get_setpoints(
+        self, time: float, state_vector: np.ndarray
+    ) -> Tuple[np.ndarray, float]:
+        _ = time
+        desired_quaternion = quaternion_from_attitude_mode(
+            state_vector, self.attitude_mode
+        )
+        prop_mass = float(state_vector[13])
+        throttle = (
+            self.burn_throttle if prop_mass > 1e-6 and self.command_armed_fn() else 0.0
+        )
+        return desired_quaternion, throttle
+
+
+class BallisticReentryGuidancePhase(GuidancePhase):
+    """Passive atmospheric entry phase until parachute deployment altitude."""
+
+    def __init__(
+        self,
+        environment: Environment,
+        parachute_deploy_alt_m: float = 12_000.0,
+        name: str = "Ballistic Reentry",
+    ):
+        self.environment = environment
+        self.parachute_deploy_alt_m = parachute_deploy_alt_m
+        self.name = name
+        self.attitude_mode = "passive"
+
+    def is_complete(self, time: float, state_vector: np.ndarray) -> bool:
+        _ = time
+        altitude = np.linalg.norm(state_vector[:3]) - self.environment.earth_radius
+        return altitude <= self.parachute_deploy_alt_m
+
+    def get_setpoints(
+        self, time: float, state_vector: np.ndarray
+    ) -> Tuple[np.ndarray, float]:
+        _ = time
+        return quaternion_from_attitude_mode(state_vector, self.attitude_mode), 0.0
+
+
+class ParachuteDescentGuidancePhase(GuidancePhase):
+    """Simple parachute descent phase using a drag regime toggle on the vehicle."""
+
+    def __init__(
+        self,
+        vehicle: Vehicle,
+        environment: Environment,
+        landing_alt_threshold_m: float = 100.0,
+        name: str = "Parachute Descent",
+    ):
+        self.vehicle = vehicle
+        self.environment = environment
+        self.landing_alt_threshold_m = landing_alt_threshold_m
+        self.name = name
+        self.attitude_mode = "passive"
+
+    def is_complete(self, time: float, state_vector: np.ndarray) -> bool:
+        _ = time
+        altitude = np.linalg.norm(state_vector[:3]) - self.environment.earth_radius
+        return altitude <= self.landing_alt_threshold_m
+
+    def get_setpoints(
+        self, time: float, state_vector: np.ndarray
+    ) -> Tuple[np.ndarray, float]:
+        _ = (time, state_vector)
+        setattr(self.vehicle, "parachute_deployed", True)
+        return quaternion_from_attitude_mode(state_vector, self.attitude_mode), 0.0

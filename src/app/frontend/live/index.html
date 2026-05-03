@@ -19,8 +19,7 @@
 
         <section class="controls">
             <input id="runId" placeholder="run_id (leave empty to start a new run)" />
-            <input id="interval" type="number" min="0.05" step="0.05" value="0.5" />
-            <button id="startBtn">Start + Connect</button>
+            <button id="startBtn" class="constellation-btn">Launch Rocket</button>
             <button id="constellationBtn" class="constellation-btn">Launch Constellation</button>
             <button id="connectBtn">Connect Existing</button>
             <button id="disconnectBtn">Disconnect</button>
@@ -68,14 +67,30 @@
             <div id="orbitPlot" class="orbit-plot"></div>
         </section>
 
-        <section class="panel phase-panel">
-            <h2>Phase Timeline</h2>
-            <div id="phaseStrip" class="phase-strip"></div>
-        </section>
+        <section class="ops-panels">
+            <section class="panel command-panel">
+                <h2>Send Command</h2>
+                <p class="panel-subtitle">Targets the currently viewed constellation satellite.</p>
+                <div class="command-grid">
+                    <label class="field-label" for="cmdAction">Command</label>
+                    <select id="cmdAction">
+                        <option value="deorbit_burn">Deorbit Burn</option>
+                    </select>
 
-        <section class="panel">
-            <h2>Event Log</h2>
-            <div id="log" class="log"></div>
+                    <label class="field-label" for="cmdExecuteAt">Execute At Sim Time (s)</label>
+                    <input id="cmdExecuteAt" type="number" min="0" step="1" value="4500" />
+
+                    <label class="field-label" for="cmdTargetPerigee">Target Perigee Altitude (km)</label>
+                    <input id="cmdTargetPerigee" type="number" min="1" max="200" step="1" value="50" />
+
+                    <button id="sendCommandBtn" class="constellation-btn">Send Command</button>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>Event Log</h2>
+                <div id="log" class="log"></div>
+            </section>
         </section>
     </div>
 
