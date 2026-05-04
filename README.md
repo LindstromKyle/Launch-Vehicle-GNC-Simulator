@@ -19,7 +19,7 @@
 
 ## Overview
 
-This project is a modular, physics-based 6-DoF rocket ascent simulator that models the full flight from vertical liftoff through staging, vacuum guidance, coast, and orbital insertion. The simulation successfully reaches user-defined orbits (e.g. 275 × 290 km) using realistic control and guidance laws. The simulation engine is backed by a production-style mission software platform: a FastAPI service with live WebSocket telemetry streaming, async Monte Carlo dispersion analysis with PostgreSQL persistence, a browser-based operator dashboard, containerized deployment via Docker Compose, and CI validation on every change.  
+This project is a modular, physics-based 6-DoF orbital mechanics simulator that models the full flight from vertical liftoff through staging, vacuum guidance, coast, orbital insertion, re-entry, and landing. The simulation successfully reaches user-defined orbits (e.g. 275 × 290 km) using realistic control and guidance laws. The simulation engine is backed by a production-style mission software platform: a FastAPI service with live WebSocket telemetry streaming, operator command uplink for constellation deorbit operations, async Monte Carlo dispersion analysis with PostgreSQL persistence, a browser-based dashboard, containerized deployment via Docker Compose, and CI validation on every change.  
 
 <br>
 
@@ -35,6 +35,8 @@ This project is a modular, physics-based 6-DoF rocket ascent simulator that mode
 - Exposed simulation execution via a full FastAPI service layer: synchronous single-run endpoint, async live telemetry endpoint with WebSocket frame streaming and a browser dashboard, and async Monte Carlo batch endpoint with PostgreSQL-persisted results  
 - Added Docker and Docker Compose workflows for reproducible local and containerized deployment with a dedicated Postgres service  
 - Established CI checks for formatting, linting, tests, and Docker build health to protect simulator reliability
+- Added command uplink and evented deorbit/re-entry workflow for constellation vehicles (Orbit Await Command -> Deorbit Burn -> Ballistic Reentry -> Parachute Descent -> Landed)
+- Added an observability system with structured JSON logs, OpenTelemetry tracing to Jaeger, Prometheus metrics, alerting, and container health probes
 
 ## Technical Highlights
 
@@ -62,8 +64,11 @@ This project is a modular, physics-based 6-DoF rocket ascent simulator that mode
 - **Mission Software Platform**  
   - FastAPI application layer with environment-driven configuration and three route groups: single-run simulation, live telemetry, and Monte Carlo  
   - WebSocket telemetry stream with sequenced frames and a browser dashboard (Chart.js altitude/speed charts + Plotly 3D orbit view)  
+  - Operator command uplink API for constellation deorbit requests, including accepted/rejected command outcomes and telemetry event emission
+  - Constellation guidance phases that transition from passive orbit into deorbit burn and atmospheric recovery sequence
   - Async background execution using a shared thread pool; live telemetry tracked with a thread-safe in-memory state machine (`queued → running → completed/failed`)  
   - PostgreSQL-backed Monte Carlo batch persistence with schema auto-initialization and named Docker volume  
+  - Observability stack with JSON logs, OTLP traces to Jaeger, Prometheus metrics, and alert rules for runtime health
   - CI pipeline enforcing Black, Ruff, Pytest, and container build validation on each change
 
 ## Repository Structure
@@ -124,6 +129,7 @@ The physics core is packaged behind a production-style mission software interfac
 - Exposes deterministic simulation execution through typed request/response contracts.
 - Separates heavy compute from API request handling using a shared thread pool.
 - Supports both human-in-the-loop workflows (live telemetry UI) and machine-driven workflows (batch Monte Carlo).
+- Supports command-in-the-loop constellation operations where operators can uplink timed deorbit commands to specific vehicles.
 - Persists batch analysis artifacts to PostgreSQL for traceability and post-run analysis.
 - Runs consistently in local development, Docker Compose, and CI.
 
@@ -132,6 +138,8 @@ The physics core is packaged behind a production-style mission software interfac
 - FastAPI app with three route groups under `/simulations`: single-run simulation, live telemetry, and Monte Carlo.
 - Shared background executor configured by `SIM_SIMULATOR_EXECUTOR_MAX_WORKERS`.
 - Live telemetry store is in-memory and thread-safe (`queued -> running -> completed/failed`).
+- Constellation command uplink endpoint supports per-vehicle deorbit command queueing and validation (`accepted`/`rejected`).
+- Constellation telemetry stream emits command lifecycle events (`command_accepted`, `command_armed`, `burn_started`, `reentry_started`, `parachute_deployed`, `landed`).
 - Monte Carlo storage is PostgreSQL-backed and initializes schema on startup.
 - Runtime configuration is environment-driven using `pydantic-settings` with `SIM_` prefix.
 
@@ -164,9 +172,10 @@ curl http://localhost:8000/health
 
 This repository includes a focused observability slice for constellation operations.
 
-- Logging: JSON log events for constellation start, command enqueue results, websocket lifecycle, and run terminal outcomes.
-- Tracing: OpenTelemetry spans emitted to console for constellation start, background run execution, command enqueue, and websocket session handling.
-- Metrics: Prometheus metrics exposed at `/metrics`.
+- Logging: Structured JSON logs for application events (`app.observability`) and Uvicorn access/error logs, unified through a shared JSON formatter in `log_config.json`.
+- Tracing: OpenTelemetry spans exported over OTLP to Jaeger (`SIM_OTLP_ENDPOINT`). Request spans are short-lived; run lifecycle spans model background execution (`constellation.run` with `initialize`, `execute`, `finalize`, and per-satellite child spans).
+- Metrics: Prometheus metrics exposed at `/metrics`: `constellation_run_outcome_total`, `app_process_cpu_seconds_total`, and `app_process_resident_memory_bytes`.
+- Alerting: Prometheus rule `SimulatorApiHighCpu` warns when CPU stays above 80% of one core for 10s.
 
 Quick verification flow:
 
@@ -215,6 +224,23 @@ Look for:
 - `constellation_run_outcome_total`
 - `app_process_cpu_seconds_total`
 - `app_process_resident_memory_bytes`
+
+5. Inspect traces in Jaeger:
+
+```text
+http://localhost:16686
+```
+
+Expected span hierarchy for a run:
+
+- `constellation.start` (short request span)
+- `constellation.run` (long background lifecycle span)
+  - `constellation.run.initialize`
+  - `constellation.run.execute`
+    - `constellation.run.satellite.W-4`
+    - `constellation.run.satellite.W-6`
+    - `constellation.run.satellite.W-7`
+  - `constellation.run.finalize`
 
 ## API Reference
 
@@ -326,7 +352,7 @@ All runtime settings are optional and read from `.env` (or process env) with pre
 
 ### Docker and Compose
 
-Compose runs API + PostgreSQL + Prometheus with dependency health checks and a persistent named volume:
+Compose runs API + PostgreSQL + Prometheus + Jaeger with dependency health checks and a persistent named volume:
 
 ```bash
 docker compose up --build
@@ -336,6 +362,12 @@ Prometheus expression browser:
 
 ```text
 http://localhost:9090/graph
+```
+
+Jaeger trace UI:
+
+```text
+http://localhost:16686
 ```
 
 Prometheus target status page:
@@ -370,6 +402,6 @@ Branch protection requires CI + Docker workflows to pass before merge.
 
 ## Future Extensions
 
-- Re-entry, descent, and landing with added control surfaces
+- Higher-fidelity re-entry aerothermodynamics and guidance tuning (heating, load envelopes, and control-surface effects)
 - C++/Rust performance port of dynamics & integration core  
 - Hardware-in-the-loop (HIL) interface layer  
