@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
-import time
 
 import pytest
 from fastapi.testclient import TestClient
