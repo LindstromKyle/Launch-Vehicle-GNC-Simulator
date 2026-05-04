@@ -1,6 +1,7 @@
 import asyncio
 import traceback
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -15,7 +16,6 @@ from app.paths.deps import (
     get_monte_carlo_storage,
 )
 from app.runners.monte_carlo_runner import MonteCarloRunner
-from app.storage.monte_carlo_storage import MonteCarloStorage
 
 monte_carlo_router = APIRouter(prefix="/simulations", tags=["Simulations"])
 
@@ -25,7 +25,7 @@ async def run_monte_carlo(
     request: MonteCarloRequest,
     executor: ThreadPoolExecutor = Depends(get_executor),
     mc_runner: MonteCarloRunner = Depends(get_monte_carlo_runner),
-    mc_storage: MonteCarloStorage = Depends(get_monte_carlo_storage),
+    mc_storage: Any = Depends(get_monte_carlo_storage),
 ):
     """
     Initiate a Monte Carlo dispersion analysis.
@@ -82,7 +82,7 @@ def _run_monte_carlo_background(
     batch_id: str,
     request: MonteCarloRequest,
     mc_runner: MonteCarloRunner,
-    mc_storage: MonteCarloStorage,
+    mc_storage: Any,
 ):
     """
     Background task to run all Monte Carlo simulations and finalize batch.
@@ -127,7 +127,7 @@ def _run_monte_carlo_background(
 )
 async def get_monte_carlo_result(
     batch_id: str,
-    mc_storage: MonteCarloStorage = Depends(get_monte_carlo_storage),
+    mc_storage: Any = Depends(get_monte_carlo_storage),
 ):
     """Retrieve results from a Monte Carlo batch."""
     try:
@@ -174,7 +174,7 @@ async def get_monte_carlo_result(
 
 @monte_carlo_router.get("/monte-carlo")
 async def list_monte_carlo_runs(
-    mc_storage: MonteCarloStorage = Depends(get_monte_carlo_storage),
+    mc_storage: Any = Depends(get_monte_carlo_storage),
 ):
     """
     List all Monte Carlo batches with basic info.

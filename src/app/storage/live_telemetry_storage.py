@@ -7,6 +7,8 @@ from threading import Lock
 from typing import Any
 from uuid import uuid4
 
+from app.observability import increment_constellation_run_outcome
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -66,16 +68,22 @@ class LiveTelemetryStorage:
     ) -> None:
         with self._lock:
             run = self._require_run(run_id)
+            previous_status = run.status
             run.status = "completed"
             run.finished_at = _utc_now_iso()
             run.summary = summary
+            if run.run_kind == "constellation" and previous_status != "completed":
+                increment_constellation_run_outcome("completed")
 
     def mark_failed(self, run_id: str, error: str) -> None:
         with self._lock:
             run = self._require_run(run_id)
+            previous_status = run.status
             run.status = "failed"
             run.finished_at = _utc_now_iso()
             run.error = error
+            if run.run_kind == "constellation" and previous_status != "failed":
+                increment_constellation_run_outcome("failed")
 
     def append_frame(self, run_id: str, frame: dict[str, Any]) -> dict[str, Any]:
         with self._lock:

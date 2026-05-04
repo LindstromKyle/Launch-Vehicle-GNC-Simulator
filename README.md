@@ -146,7 +146,7 @@ pip install -r requirements-dev.txt
 2. Start the API from the project root:
 
 ```bash
-uvicorn app.main:app --app-dir src --host 0.0.0.0 --port 8000
+uvicorn app.main:app --app-dir src --host 0.0.0.0 --port 8000 --log-config log_config.json
 ```
 
 3. Confirm health:
@@ -160,6 +160,62 @@ curl http://localhost:8000/health
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
+### Constellation Observability 
+
+This repository includes a focused observability slice for constellation operations.
+
+- Logging: JSON log events for constellation start, command enqueue results, websocket lifecycle, and run terminal outcomes.
+- Tracing: OpenTelemetry spans emitted to console for constellation start, background run execution, command enqueue, and websocket session handling.
+- Metrics: Prometheus metrics exposed at `/metrics`.
+
+Quick verification flow:
+
+1. Start a constellation run:
+
+```bash
+curl -X POST "http://localhost:8000/simulations/live/constellation/start"
+```
+
+2. Send one accepted command (replace `<run_id>`):
+
+```bash
+curl -X POST "http://localhost:8000/simulations/live/constellation/command" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "run_id": "<run_id>",
+    "vehicle_id": "W-4",
+    "action": "deorbit_burn",
+    "execute_at_sim_time_s": 20,
+    "target_perigee_alt_km": 120
+  }'
+```
+
+3. Send one rejected command (invalid run id):
+
+```bash
+curl -X POST "http://localhost:8000/simulations/live/constellation/command" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "run_id": "missing-run",
+    "vehicle_id": "W-4",
+    "action": "deorbit_burn",
+    "execute_at_sim_time_s": 20,
+    "target_perigee_alt_km": 120
+  }'
+```
+
+4. Inspect metrics:
+
+```bash
+curl http://localhost:8000/metrics
+```
+
+Look for:
+
+- `constellation_run_outcome_total`
+- `app_process_cpu_seconds_total`
+- `app_process_resident_memory_bytes`
+
 ## API Reference
 
 ### Endpoint summary
@@ -172,10 +228,13 @@ curl http://localhost:8000/health
 | GET | `/simulations/live/assets/styles.css` | Live UI stylesheet | `200` |
 | GET | `/simulations/live/assets/app.js` | Live UI JavaScript | `200` |
 | POST | `/simulations/live/start` | Start async simulation run and return `run_id` | `200`, `422`, `500` |
+| POST | `/simulations/live/constellation/start` | Start async constellation run and return `run_id` | `200`, `422`, `500` |
+| POST | `/simulations/live/constellation/command` | Queue a deorbit command for a constellation vehicle | `200`, `422` |
 | WS | `/simulations/live/{run_id}/ws` | Stream telemetry frames + terminal status | `101`, `404` |
 | POST | `/simulations/monte-carlo` | Start async Monte Carlo batch and return `batch_id` | `200`, `422`, `500` |
 | GET | `/simulations/monte-carlo` | List Monte Carlo batches | `200`, `500` |
 | GET | `/simulations/monte-carlo/{batch_id}` | Poll batch status/results | `200`, `202`, `404`, `500` |
+| GET | `/metrics` | Prometheus metrics snapshot | `200` |
 
 ### Canonical response behavior
 
@@ -267,10 +326,22 @@ All runtime settings are optional and read from `.env` (or process env) with pre
 
 ### Docker and Compose
 
-Compose runs API + PostgreSQL with dependency health checks and a persistent named volume:
+Compose runs API + PostgreSQL + Prometheus with dependency health checks and a persistent named volume:
 
 ```bash
 docker compose up --build
+```
+
+Prometheus expression browser:
+
+```text
+http://localhost:9090/graph
+```
+
+Prometheus target status page:
+
+```text
+http://localhost:9090/targets
 ```
 
 Standalone container workflow:

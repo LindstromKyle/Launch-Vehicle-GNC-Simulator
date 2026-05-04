@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     environment: str = "dev"
     debug: bool = False
     simulator_executor_max_workers: int = 4
+    otlp_endpoint: str = ""
     db_host: str = "localhost"
     db_port: int = 5432
     db_name: str = "launch_sim"

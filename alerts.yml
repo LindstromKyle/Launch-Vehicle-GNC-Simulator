@@ -1,0 +1,12 @@
+groups:
+  - name: simulator-alerts
+    rules:
+      - alert: SimulatorApiHighCpu
+        expr: rate(app_process_cpu_seconds_total[20s]) * 100 > 80
+        for: 10s
+        labels:
+          severity: warning
+          service: simulator-api
+        annotations:
+          summary: "Simulator API CPU above 80%"
+          description: "CPU usage has been above 80% of one core for at least 10 seconds."

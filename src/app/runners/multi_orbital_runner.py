@@ -14,7 +14,9 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 import numpy as np
+from opentelemetry import context as otel_context
 
+from app.observability import get_tracer
 from simulator.controller import Controller, PIDAttitudeController
 from simulator.environment import Environment
 from simulator.guidance import (
@@ -55,6 +57,7 @@ _T_FINAL = 8_000.0  # Final sim time (s)
 _DELTA_T = 1.0  # Integration step size (s)
 _TELEMETRY_INTERVAL = 10.0  # Minimum seconds between emitted frames
 _STEP_DELAY_S = 0.05  # Real-time sleep between emitted frames (seconds)
+_TRACER = get_tracer()
 
 
 @dataclass
@@ -263,6 +266,44 @@ def _run_satellite(
     sim.run(telemetry_callback=tagged_cb, telemetry_interval=_TELEMETRY_INTERVAL)
 
 
+def _run_satellite_with_span(
+    parent_ctx: otel_context.Context,
+    name: str,
+    perigee_alt_km: float,
+    eccentricity: float,
+    inclination_deg: float,
+    raan_deg: float,
+    arg_perigee_deg: float,
+    true_anomaly_deg: float,
+    telemetry_callback: Callable[[dict[str, Any]], None],
+    command_provider: Callable[[str, float], list[dict[str, Any]]] | None = None,
+    command_event_callback: Callable[[dict[str, Any]], None] | None = None,
+) -> None:
+    token = otel_context.attach(parent_ctx)
+    try:
+        with _TRACER.start_as_current_span(
+            f"constellation.run.satellite.{name}"
+        ) as span:
+            span.set_attribute("vehicle_id", name)
+            span.set_attribute("orbit.perigee_alt_km", perigee_alt_km)
+            span.set_attribute("orbit.eccentricity", eccentricity)
+            span.set_attribute("orbit.inclination_deg", inclination_deg)
+            _run_satellite(
+                name,
+                perigee_alt_km,
+                eccentricity,
+                inclination_deg,
+                raan_deg,
+                arg_perigee_deg,
+                true_anomaly_deg,
+                telemetry_callback,
+                command_provider,
+                command_event_callback,
+            )
+    finally:
+        otel_context.detach(token)
+
+
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
@@ -281,10 +322,12 @@ def run_constellation_simulation(
     Args:
         telemetry_callback: Called for every telemetry frame from every satellite.
     """
+    parent_ctx = otel_context.get_current()
     with ThreadPoolExecutor(max_workers=len(CONSTELLATION)) as pool:
         futures = {
             pool.submit(
-                _run_satellite,
+                _run_satellite_with_span,
+                parent_ctx,
                 name,
                 perigee_alt_km,
                 eccentricity,

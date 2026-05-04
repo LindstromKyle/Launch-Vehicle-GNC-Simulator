@@ -27,11 +27,52 @@ services:
       SIM_DB_NAME: ${SIM_DB_NAME:-launch_sim}
       SIM_DB_USER: ${SIM_DB_USER:-sim_user}
       SIM_DB_PASSWORD: ${SIM_DB_PASSWORD:-sim_password}
+      SIM_OTLP_ENDPOINT: http://jaeger:4317
     depends_on:
       postgres:
         condition: service_healthy
+      jaeger:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     ports:
       - "8000:8000"
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.58
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:14269/ || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "16686:16686"
+
+  prometheus:
+    image: prom/prometheus:v2.53.3
+    depends_on:
+      simulator-api:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/alerts.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
 
 volumes:
   postgres_data:

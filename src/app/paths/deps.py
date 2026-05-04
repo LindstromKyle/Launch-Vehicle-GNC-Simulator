@@ -1,11 +1,11 @@
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 
 from starlette.requests import HTTPConnection
 
 from app.runners.monte_carlo_runner import MonteCarloRunner
 from app.settings import Settings
 from app.storage.live_telemetry_storage import LiveTelemetryStorage
-from app.storage.monte_carlo_storage import MonteCarloStorage
 
 
 def get_settings(connection: HTTPConnection) -> Settings:
@@ -16,7 +16,7 @@ def get_executor(connection: HTTPConnection) -> ThreadPoolExecutor:
     return connection.app.state.executor
 
 
-def get_monte_carlo_storage(connection: HTTPConnection) -> MonteCarloStorage:
+def get_monte_carlo_storage(connection: HTTPConnection) -> Any:
     return connection.app.state.mc_storage
 
 
